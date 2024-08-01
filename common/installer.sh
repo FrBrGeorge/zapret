@@ -548,7 +548,7 @@ check_prerequisites_linux()
 		APK=$(whichq apk)
 		if [ -x "$APTGET" ] ; then
 			"$APTGET" update
-			"$APTGET" install -y --no-install-recommends $PKGS dnsutils || {
+			"$APTGET" install -y $PKGS bind-utils || {
 				echo could not install prerequisites
 				exitp 6
 			}

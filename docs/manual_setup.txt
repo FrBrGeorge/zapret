@@ -8,7 +8,7 @@
 
 Установить пакеты :
  apt-get update
- apt-get install ipset curl dnsutils git
+ apt-get install ipset curl bind-utils git
 
 Если хотите использовать nftables, то нужен пакет nftables, а ipset не обязателен.
 
@@ -73,7 +73,7 @@ Centos с 7 версии и более-менее новые федоры пос
 В качестве пакетного менеджера используется yum.
 
 Установить пакеты :
- yum install -y curl ipset dnsutils git
+ yum install -y curl ipset bind-utils git
 
 Далее все аналогично debian.
 
