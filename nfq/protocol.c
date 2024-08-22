@@ -104,7 +104,7 @@ bool HttpReplyLooksLikeDPIRedirect(const uint8_t *data, size_t len, const char *
 	
 	code = HttpReplyCode(data,len);
 	
-	if (code!=302 && code!=307 || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
+	if ((code!=302 && code!=307) || !HttpExtractHeader(data,len,"\nLocation:",loc,sizeof(loc))) return false;
 
 	// something like : https://censor.net/badpage.php?reason=denied&source=RKN
 		
@@ -177,7 +177,7 @@ bool IsTLSRecordFull(const uint8_t *data, size_t len)
 }
 bool IsTLSClientHello(const uint8_t *data, size_t len, bool bPartialIsOK)
 {
-	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] >= 0x01 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
+	return len >= 6 && data[0] == 0x16 && data[1] == 0x03 && data[2] <= 0x03 && data[5] == 0x01 && (bPartialIsOK || TLSRecordLen(data) <= len);
 }
 
 size_t TLSHandshakeLen(const uint8_t *data)
@@ -210,7 +210,7 @@ bool TLSFindExtInHandshake(const uint8_t *data, size_t len, uint16_t type, const
 	//	<CompressionMethods>
 	// u16	ExtensionsLength
 
-	size_t l, ll;
+	size_t l;
 
 	if (!bPartialIsOK && !IsTLSHandshakeFull(data,len)) return false;
 
@@ -281,7 +281,7 @@ static bool TLSExtractHostFromExt(const uint8_t *ext, size_t elen, char *host, s
 	size_t slen = pntoh16(ext + 3);
 	ext += 5; elen -= 5;
 	if (slen < elen) return false;
-	if (ext && len_host)
+	if (host && len_host)
 	{
 		if (slen >= len_host) slen = len_host - 1;
 		for (size_t i = 0; i < slen; i++) host[i] = tolower(ext[i]);
@@ -342,6 +342,8 @@ static uint8_t tvb_get_varint(const uint8_t *tvb, uint64_t *value)
 		if (value) *value = pntoh64(tvb) & 0x3FFFFFFFFFFFFFFF;
 		return 8;
 	}
+	// impossible case
+	if (*value) *value = 0;
 	return 0;
 }
 static uint8_t tvb_get_size(uint8_t tvb)
