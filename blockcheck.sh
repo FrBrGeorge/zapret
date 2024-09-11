@@ -2,11 +2,19 @@
 
 EXEDIR="$(dirname "$0")"
 EXEDIR="$(cd "$EXEDIR"; pwd)"
-ZAPRET_CONFIG="$EXEDIR/config"
-ZAPRET_BASE="$EXEDIR"
+ZAPRET_BASE=${ZAPRET_BASE:-"$EXEDIR"}
+ZAPRET_RW=${ZAPRET_RW:-"$ZAPRET_BASE"}
+ZAPRET_CONFIG=${ZAPRET_CONFIG:-"$ZAPRET_RW/config"}
+ZAPRET_CONFIG_DEFAULT="$ZAPRET_BASE/config.default"
+
+CURL=${CURL:-curl}
 
 [ -f "$ZAPRET_CONFIG" ] || {
-	[ -f "${ZAPRET_CONFIG}.default" ] && cp "${ZAPRET_CONFIG}.default" "$ZAPRET_CONFIG"
+	[ -f "$ZAPRET_CONFIG_DEFAULT" ] && {
+		ZAPRET_CONFIG_DIR="$(dirname "$ZAPRET_CONFIG")"
+		[ -d "$ZAPRET_CONFIG_DIR" ] || mkdir -p "$ZAPRET_CONFIG_DIR"
+		cp "$ZAPRET_CONFIG_DEFAULT" "$ZAPRET_CONFIG"
+	}
 }
 [ -f "$ZAPRET_CONFIG" ] && . "$ZAPRET_CONFIG"
 . "$ZAPRET_BASE/common/base.sh"
@@ -44,7 +52,7 @@ HDRTEMP=/tmp/zapret-hdr.txt
 NFT_TABLE=blockcheck
 
 DNSCHECK_DNS=${DNSCHECK_DNS:-8.8.8.8 1.1.1.1 77.88.8.1}
-DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com putinhuylo.com rutracker.org www.torproject.org bbc.com}
+DNSCHECK_DOM=${DNSCHECK_DOM:-pornhub.com ntc.party rutracker.org www.torproject.org bbc.com}
 DNSCHECK_DIG1=/tmp/dig1.txt
 DNSCHECK_DIG2=/tmp/dig2.txt
 DNSCHECK_DIGS=/tmp/digs.txt
@@ -485,12 +493,12 @@ curl_translate_code()
 curl_supports_tls13()
 {
 	local r
-	curl --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	$CURL --tlsv1.3 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? = 2 ] && return 1
 	# curl can have tlsv1.3 key present but ssl library without TLS 1.3 support
 	# this is online test because there's no other way to trigger library incompatibility case
-	curl --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://w3.org 2>/dev/null
+	$CURL --tlsv1.3 --max-time $CURL_MAX_TIME -Is -o /dev/null https://w3.org 2>/dev/null
 	r=$?
 	[ $r != 4 -a $r != 35 ]
 }
@@ -498,16 +506,16 @@ curl_supports_tls13()
 curl_supports_tlsmax()
 {
 	# supported only in OpenSSL and LibreSSL
-	curl --version | grep -Fq -e OpenSSL -e LibreSSL -e BoringSSL -e GnuTLS -e quictls || return 1
+	$CURL --version | grep -Fq -e OpenSSL -e LibreSSL -e BoringSSL -e GnuTLS -e quictls || return 1
 	# supported since curl 7.54
-	curl --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	$CURL --tls-max 1.2 -Is -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	# return code 2 = init failed. likely bad command line options
 	[ $? != 2 ]
 }
 
 curl_supports_connect_to()
 {
-	curl --connect-to 127.0.0.1:: -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
+	$CURL --connect-to 127.0.0.1:: -o /dev/null --max-time 1 http://127.0.0.1:65535 2>/dev/null
 	[ "$?" != 2 ]
 }
 
@@ -515,7 +523,7 @@ curl_supports_http3()
 {
 	# if it has http3 : curl: (3) HTTP/3 requested for non-HTTPS URL
 	# otherwise : curl: (2) option --http3-only: is unknown
-	curl --connect-to 127.0.0.1:: -o /dev/null --max-time 1 --http3-only http://127.0.0.1:65535 2>/dev/null
+	$CURL --connect-to 127.0.0.1:: -o /dev/null --max-time 1 --http3-only http://127.0.0.1:65535 2>/dev/null
 	[ "$?" != 2 ]
 }
 
@@ -541,8 +549,8 @@ curl_with_subst_ip()
 	local connect_to="--connect-to $1::[$3]${2:+:$2}" arg
 	shift ; shift ; shift
 	[ "$CURL_VERBOSE" = 1 ] && arg="-v"
-	[ "$CURL_CMD" = 1 ] && echo curl ${arg:+$arg }$connect_to "$@"
-	ALL_PROXY="$ALL_PROXY" curl ${arg:+$arg }$connect_to "$@"
+	[ "$CURL_CMD" = 1 ] && echo $CURL ${arg:+$arg }$connect_to "$@"
+	ALL_PROXY="$ALL_PROXY" $CURL ${arg:+$arg }$connect_to "$@"
 }
 curl_with_dig()
 {
@@ -1487,7 +1495,7 @@ ask_params()
 	curl_supports_connect_to || {
 		echo "installed curl does not support --connect-to option. pls install at least curl 7.49"
 		echo "current curl version:"
-		curl --version
+		$CURL --version
 		exitp 1
 	}
 

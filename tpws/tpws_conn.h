@@ -14,6 +14,8 @@
 #define SPLICE_LEN 65536
 #define DEFAULT_MAX_CONN	512
 #define DEFAULT_MAX_ORPHAN_TIME	5
+#define DEFAULT_TCP_USER_TIMEOUT_LOCAL	10
+#define DEFAULT_TCP_USER_TIMEOUT_REMOTE	20
 
 int event_loop(const int *listen_fd, size_t listen_fd_ct);
 
@@ -69,7 +71,7 @@ struct tproxy_conn
 
 	// these value are used in flow control. we do not use ET (edge triggered) polling
 	// if we dont disable notifications they will come endlessly until condition becomes false and will eat all cpu time
-	bool bFlowIn,bFlowOut, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
+	bool bFlowIn,bFlowOut, bShutdown, bFlowInPrev,bFlowOutPrev, bPrevRdhup;
 
 	// total read,write
 	uint64_t trd,twr, tnrd;
