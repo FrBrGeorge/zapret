@@ -5,17 +5,27 @@
 #include "helpers.h"
 
 // inplace tolower() and add to pool
-static bool addpool(strpool **hostlist, char **s, const char *end)
+static bool addpool(strpool **hostlist, char **s, const char *end, int *ct)
 {
-	char *p;
-	
-	// advance until eol lowering all chars
-	for (p = *s; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
-	if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+	char *p=*s;
+
+	// comment line
+	if ( *p == '#' || *p == ';' || *p == '/' || *p == '\r' || *p == '\n')
 	{
-		StrPoolDestroy(hostlist);
-		*hostlist = NULL;
-		return false;
+		// advance until eol
+		for (; p<end && *p && *p!='\r' && *p != '\n'; p++);
+	}
+	else
+	{
+		// advance until eol lowering all chars
+		for (; p<end && *p && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
+		if (!StrPoolAddStrLen(hostlist, *s, p-*s))
+		{
+			StrPoolDestroy(hostlist);
+			*hostlist = NULL;
+			return false;
+		}
+		(*ct)++;
 	}
 	// advance to the next line
 	for (; p<end && (!*p || *p=='\r' || *p=='\n') ; p++);
@@ -23,7 +33,7 @@ static bool addpool(strpool **hostlist, char **s, const char *end)
 	return true;
 }
 
-bool AppendHostList(strpool **hostlist, char *filename)
+bool AppendHostList(strpool **hostlist, const char *filename)
 {
 	char *p, *e, s[256], *zbuf;
 	size_t zsize;
@@ -51,14 +61,12 @@ bool AppendHostList(strpool **hostlist, char *filename)
 			e = zbuf + zsize;
 			while(p<e)
 			{
-				if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-				if (!addpool(hostlist,&p,e))
+				if (!addpool(hostlist,&p,e,&ct))
 				{
 					DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 					free(zbuf);
 					return false;
 				}
-				ct++;
 			}
 			free(zbuf);
 		}
@@ -72,17 +80,15 @@ bool AppendHostList(strpool **hostlist, char *filename)
 	{
 		DLOG_CONDUP("loading plain text list\n");
 		
-		while (fgets(s, 256, F))
+		while (fgets(s, sizeof(s), F))
 		{
 			p = s;
-			if ( *p == '#' || *p == ';' || *p == '/' || *p == '\n' ) continue;
-			if (!addpool(hostlist,&p,p+strlen(p)))
+			if (!addpool(hostlist,&p,p+strlen(p),&ct))
 			{
 				DLOG_ERR("Not enough memory to store host list : %s\n", filename);
 				fclose(F);
 				return false;
 			}
-			ct++;
 		}
 		fclose(F);
 	}
@@ -154,35 +160,52 @@ static bool HostlistCheck_(strpool *hostlist, strpool *hostlist_exclude, const c
 	return true;
 }
 
-// return : true = apply fooling, false = do not apply
-bool HostlistCheck(const char *host, bool *excluded)
+static bool LoadIncludeHostListsForProfile(struct desync_profile *dp)
 {
-	if (*params.hostlist_auto_filename)
+	if (!LoadHostLists(&dp->hostlist, &dp->hostlist_files))
+		return false;
+	if (*dp->hostlist_auto_filename)
 	{
-		time_t t = file_mod_time(params.hostlist_auto_filename);
-		if (t!=params.hostlist_auto_mod_time)
+		dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
+		NonEmptyHostlist(&dp->hostlist);
+	}
+	return true;
+}
+
+bool HostlistCheck(struct desync_profile *dp, const char *host, bool *excluded)
+{
+	VPRINT("* hostlist check for profile %d\n",dp->n);
+	if (*dp->hostlist_auto_filename)
+	{
+		time_t t = file_mod_time(dp->hostlist_auto_filename);
+		if (t!=dp->hostlist_auto_mod_time)
 		{
-			DLOG_CONDUP("Autohostlist was modified by another process. Reloading include hostslist.\n");
-			if (!LoadIncludeHostLists())
+			DLOG_CONDUP("Autohostlist '%s' from profile %d was modified. Reloading include hostlists for this profile.\n",dp->hostlist_auto_filename, dp->n);
+			if (!LoadIncludeHostListsForProfile(dp))
 			{
 				// what will we do without hostlist ?? sure, gonna die
 				exit(1);
 			}
-			params.hostlist_auto_mod_time = t;
+			dp->hostlist_auto_mod_time = t;
+			NonEmptyHostlist(&dp->hostlist);
 		}
 	}
-	return HostlistCheck_(params.hostlist, params.hostlist_exclude, host, excluded);
+	return HostlistCheck_(dp->hostlist, dp->hostlist_exclude, host, excluded);
 }
 
 bool LoadIncludeHostLists()
 {
-	if (!LoadHostLists(&params.hostlist, &params.hostlist_files))
-		return false;
-	if (*params.hostlist_auto_filename)
-		params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+		if (!LoadIncludeHostListsForProfile(&dpl->dp))
+			return false;
 	return true;
 }
 bool LoadExcludeHostLists()
 {
-	return LoadHostLists(&params.hostlist_exclude, &params.hostlist_exclude_files);
+	struct desync_profile_list *dpl;
+	LIST_FOREACH(dpl, &params.desync_profiles, next)
+		if (!LoadHostLists(&dpl->dp.hostlist_exclude, &dpl->dp.hostlist_exclude_files))
+			return false;
+	return true;
 }

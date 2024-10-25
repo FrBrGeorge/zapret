@@ -308,3 +308,36 @@ nfqws,tpws: detect TLS 1.2 ClientHello from very old libraries with SSL 3.0 vers
 nfqws,tpws: debug log to file and syslog
 tpws: --connect-bind-addr option
 tpws: log local endpoint (including source port number) for remote leg
+
+v62:
+
+tpws: connection close logic rewrite. tcp user timeout parameters for local and remote leg.
+nfqws: multi-strategy
+
+v63:
+
+tpws: multi-strategy
+
+v64:
+
+blockcheck: warn if dpi bypass software is already running
+blockcheck: TPWS_EXTRA, NFQWS_EXTRA
+init.d: multiple custom scripts
+
+v65:
+
+init.d: dynamic number allocation for dnum,tpws_port,qnum
+init.d: FW_EXTRA_PRE, FW_EXTRA_POST
+init.d: zapret_custom_firewall_nft_flush
+nfqws,tpws: l7proto and client ip:port info in autohostlist debug log
+nfqws,tpws: user mode ipset filter support
+nfqws,tpws: l7proto filter support
+tpws: fixed MSS apply in transparent mode
+nfqws: fixed autottl apply if desync profile changed
+tpws,nfqws: fixed 100% cpu hang on gzipped list with comments
+ipset: get_refilter_ipsum.sh , get_refilter_domain.sh
+
+v66:
+
+init.d: rewrite traffic interception and daemon launch parameters in config file. this break compatibility with old versions.
+init.d: openwrt-minimal : tpws launch for low storage openwrt devices

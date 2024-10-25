@@ -1,14 +1,21 @@
 #define _GNU_SOURCE
 
 #include "helpers.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/stat.h>
-
+#include <libgen.h>
 
 #include "params.h"
+
+void rtrim(char *s)
+{
+	if (s)
+		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
+}
 
 void hexdump_limited_dlog(const uint8_t *data, size_t size, size_t limit)
 {
@@ -180,6 +187,11 @@ bool pton6_port(const char *s, struct sockaddr_in6 *sa)
 	return true;
 }
 
+uint16_t saport(const struct sockaddr *sa)
+{
+	return htons(sa->sa_family==AF_INET ? ((struct sockaddr_in*)sa)->sin_port :
+		     sa->sa_family==AF_INET6 ? ((struct sockaddr_in6*)sa)->sin6_port : 0);
+}
 
 void dbgprint_socket_buffers(int fd)
 {
@@ -318,27 +330,165 @@ bool pf_in_range(uint16_t port, const port_filter *pf)
 bool pf_parse(const char *s, port_filter *pf)
 {
 	unsigned int v1,v2;
+	char c;
 
 	if (!s) return false;
-	if (*s=='~') 
+	if (*s=='~')
 	{
 		pf->neg=true;
 		s++;
 	}
 	else
 		pf->neg=false;
-	if (sscanf(s,"%u-%u",&v1,&v2)==2)
+	if (sscanf(s,"%u-%u%c",&v1,&v2,&c)==2)
 	{
-		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
+		if (v1>65535 || v2>65535 || v1>v2) return false;
 		pf->from=(uint16_t)v1;
 		pf->to=(uint16_t)v2;
 	}
-	else if (sscanf(s,"%u",&v1)==1)
+	else if (sscanf(s,"%u%c",&v1,&c)==1)
 	{
-		if (!v1 || v1>65535) return false;
+		if (v1>65535) return false;
 		pf->to=pf->from=(uint16_t)v1;
 	}
 	else
 		return false;
+	// deny all case
+	if (!pf->from && !pf->to) pf->neg=true;
 	return true;
+}
+bool pf_is_empty(const port_filter *pf)
+{
+	return !pf->neg && !pf->from && !pf->to;
+}
+
+void fill_random_bytes(uint8_t *p,size_t sz)
+{
+	size_t k,sz16 = sz>>1;
+	for(k=0;k<sz16;k++) ((uint16_t*)p)[k]=(uint16_t)random();
+	if (sz & 1) p[sz-1]=(uint8_t)random();
+}
+void fill_random_az(uint8_t *p,size_t sz)
+{
+	size_t k;
+	for(k=0;k<sz;k++) p[k] = 'a'+(random() % ('z'-'a'));
+}
+void fill_random_az09(uint8_t *p,size_t sz)
+{
+	size_t k;
+	uint8_t rnd;
+	for(k=0;k<sz;k++)
+	{
+		rnd = random() % (10 + 'z'-'a'+1);
+		p[k] = rnd<10 ? rnd+'0' : 'a'+rnd-10;
+	}
+}
+
+bool cd_to_exe_dir(const char *argv0)
+{
+	char *s,*d;
+	bool bOK=false;
+	if ((s = strdup(argv0)))
+	{
+		if ((d = dirname(s)))
+			bOK = !chdir(d);
+		free(s);
+	}
+	return bOK;
+}
+
+
+static void mask_from_preflen6_make(uint8_t plen, struct in6_addr *a)
+{
+	if (plen >= 128)
+		memset(a->s6_addr,0xFF,16);
+	else
+	{
+		uint8_t n = plen >> 3;
+		memset(a->s6_addr,0xFF,n);
+		memset(a->s6_addr+n,0x00,16-n);
+		a->s6_addr[n] = (uint8_t)(0xFF00 >> (plen & 7));
+	}
+}
+struct in6_addr ip6_mask[129];
+void mask_from_preflen6_prepare(void)
+{
+	for (int plen=0;plen<=128;plen++) mask_from_preflen6_make(plen, ip6_mask+plen);
+}
+
+#if defined(__GNUC__) && !defined(__llvm__)
+__attribute__((optimize ("no-strict-aliasing")))
+#endif
+void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
+{
+	// int128 requires 16-bit alignment. in struct sockaddr_in6.sin6_addr is 8-byte aligned.
+	// it causes segfault on x64 arch with latest compiler. it can cause misalign slowdown on other archs
+	// use 64-bit AND
+	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
+	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
+}
+
+void str_cidr4(char *s, size_t s_len, const struct cidr4 *cidr)
+{
+	char s_ip[16];
+	*s_ip=0;
+	inet_ntop(AF_INET, &cidr->addr, s_ip, sizeof(s_ip));
+	snprintf(s,s_len,cidr->preflen<32 ? "%s/%u" : "%s", s_ip, cidr->preflen);
+}
+void print_cidr4(const struct cidr4 *cidr)
+{
+	char s[19];
+	str_cidr4(s,sizeof(s),cidr);
+	printf("%s",s);
+}
+void str_cidr6(char *s, size_t s_len, const struct cidr6 *cidr)
+{
+	char s_ip[40];
+	*s_ip=0;
+	inet_ntop(AF_INET6, &cidr->addr, s_ip, sizeof(s_ip));
+	snprintf(s,s_len,cidr->preflen<128 ? "%s/%u" : "%s", s_ip, cidr->preflen);
+}
+void print_cidr6(const struct cidr6 *cidr)
+{
+	char s[44];
+	str_cidr6(s,sizeof(s),cidr);
+	printf("%s",s);
+}
+bool parse_cidr4(char *s, struct cidr4 *cidr)
+{
+	char *p,d;
+	bool b;
+	unsigned int plen;
+
+	if ((p = strchr(s, '/')))
+	{
+		if (sscanf(p + 1, "%u", &plen)!=1 || plen>32)
+			return false;
+		cidr->preflen = (uint8_t)plen;
+		d=*p; *p=0; // backup char
+	}
+	else
+		cidr->preflen = 32;
+	b = (inet_pton(AF_INET, s, &cidr->addr)==1);
+	if (p) *p=d; // restore char
+	return b;
+}
+bool parse_cidr6(char *s, struct cidr6 *cidr)
+{
+	char *p,d;
+	bool b;
+	unsigned int plen;
+
+	if ((p = strchr(s, '/')))
+	{
+		if (sscanf(p + 1, "%u", &plen)!=1 || plen>128)
+			return false;
+		cidr->preflen = (uint8_t)plen;
+		d=*p; *p=0; // backup char
+	}
+	else
+		cidr->preflen = 128;
+	b = (inet_pton(AF_INET6, s, &cidr->addr)==1);
+	if (p) *p=d; // restore char
+	return b;
 }

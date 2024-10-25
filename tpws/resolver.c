@@ -103,7 +103,13 @@ static void *resolver_thread(void *arg)
 				ri->ga_res = getaddrinfo(ri->dom,sport,&hints,&ai);
 				if (!ri->ga_res)
 				{
-					memcpy(&ri->ss, ai->ai_addr, ai->ai_addrlen);
+					if (ai->ai_addrlen>sizeof(ri->ss))
+					{
+						DLOG_ERR("getaddrinfo returned too large address\n");
+						ri->ga_res = EAI_FAIL;
+					}
+					else
+						memcpy(&ri->ss, ai->ai_addr, ai->ai_addrlen);
 					freeaddrinfo(ai);
 				}
 				//printf("THREAD %d END JOB %s  FIRST=%p\n", syscall(SYS_gettid), ri->dom, TAILQ_FIRST(&resolver.resolve_list));
@@ -214,11 +220,13 @@ bool resolver_init(int threads, int fd_signal_pipe)
 	pthread_attr_t attr;
 	if (pthread_attr_init(&attr)) goto ex;
 	// set minimum thread stack size
-	if (pthread_attr_setstacksize(&attr,20480))
+
+	if (pthread_attr_setstacksize(&attr,PTHREAD_STACK_MIN>20480 ? PTHREAD_STACK_MIN : 20480))
 	{
 		pthread_attr_destroy(&attr);
 		goto ex;
 	}
+
 	for(t=0, resolver.threads=threads ; t<threads ; t++)
 	{
 		if (pthread_create(resolver.thread + t, &attr, resolver_thread, NULL))

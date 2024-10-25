@@ -97,7 +97,8 @@ Then we can reduce CPU load, refusing to process unnecessary packets.
 `iptables -t mangle -I POSTROUTING -o <external_interface> -p tcp --dport 80 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:6 -m mark ! --mark 0x40000000/0x40000000 -m set --match-set zapret dst -j NFQUEUE --queue-num 200 --queue-bypass`
 
 Mark filter does not allow nfqws-generated packets to enter the queue again.
-Its necessary to use this filter when also using `connbytes 1:6`. Without it packet ordering can be changed breaking the whole idea.
+Its necessary to use this filter when also using `connbytes`. Without it packet ordering can be changed breaking the whole idea.
+Also if there's huge packet send from nfqws it may deadlock without mark filter.
 
 Some attacks require redirection of incoming packets :
 
@@ -206,6 +207,13 @@ nfqws takes the following parameters:
  --hostlist-auto-fail-time=<int>                ; all failed attemps must be within these seconds (default : 60)
  --hostlist-auto-retrans-threshold=<int>        ; how many request retransmissions cause attempt to fail (default : 3)
  --hostlist-auto-debug=<logfile>        	; debug auto hostlist positives
+ --new                                          ; begin new strategy
+ --filter-l3=ipv4|ipv6                          ; L3 protocol filter. multiple comma separated values allowed.
+ --filter-tcp=[~]port1[-port2]                  ; TCP port filter. ~ means negation. setting tcp and not setting udp filter denies udp.
+ --filter-udp=[~]port1[-port2]                  ; UDP port filter. ~ means negation. setting udp and not setting tcp filter denies tcp.
+ --filter-l7=[http|tls|quic|wireguard|dht|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --ipset=<filename>                             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude=<filename>                     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 ```
 
 The manipulation parameters can be combined in any way.
@@ -459,8 +467,8 @@ becomes the possible maximum. If you set `scale_factor` 64:0, it will be very sl
 
 On the other hand, the server response must not be large enough for the DPI to find what it is looking for.
 
-Hostlist filter does not affect `--wssize` because it works since the connection initiation when it's not yet possible
-to extract the host name.
+`--wssize` is not applied in desync profiles with hostlist filter because it works since the connection initiation when it's not yet possible
+to extract the host name. But it works with auto hostlist profiles.
 
 `--wssize` may slow down sites and/or increase response time. It's desired to use another methods if possible.
 
@@ -565,6 +573,35 @@ nfqws sees packets with internal network source address. If fragmented NAT does 
 This results in attempt to send packets to internet with internal IP address.
 You need to use nftables instead with hook priority 101 or higher.
 
+### multiple strategies
+
+`nfqws` can apply different strategies to different requests. It's done with multiple desync profiles.
+Profiles are delimited by the `--new` parameter. First profile is created automatically and does not require `--new`.
+Each profile has a filter. By default it's empty and profile matches any packet.
+Filter can have hard parameters : ip version, ipset and tcp/udp port range.
+Hard parameters are always identified unambiguously even on zero-phase when hostname and L7 are unknown yet.
+Hostlists can also act as a filter. They can be combined with hard parameters.
+When a packet comes profiles are matched from the first to the last until first filter condition match.
+Hard filter is matched first. If it does not match verification goes to the next profile.
+If a profile matches hard filter , L7 filter and has autohostlist it's selected immediately.
+If a profile matches hard filter , L7 filter and has normal hostlist(s) and hostname is unknown yet verification goes to the next profile.
+Otherwise profile hostlist(s) are checked for the hostname. If it matches profile is selected.
+Otherwise verification goes to the next profile.
+
+It's possible that before knowing L7 and hostname connection is served by one profile and after
+this information is revealed it's switched to another profile.
+If you use 0-phase desync methods think carefully what can happen during strategy switch.
+Use `--debug` logging to understand better what `nfqws` does.
+
+Profiles are numbered from 1 to N. There's last empty profile in the chain numbered 0.
+It's used when no filter matched.
+
+IMPORTANT : multiple strategies exist only for the case when it's not possible to combine all to one strategy.
+Copy-pasting blockcheck results of different websites to multiple strategies lead to the mess.
+This way you may never unblock all resources and only confuse yourself.
+
+IMPORTANT : user-mode ipset implementation was not designed as a kernel version replacement. Kernel version is much more effective.
+It's for the systems that lack ipset support : Windows and Linux without nftables and ipset kernel modules (Android, for example).
 
 ## tpws
 
@@ -602,6 +639,13 @@ tpws is transparent proxy.
  --maxfiles=<max_open_files>    ; max file descriptors (setrlimit). min requirement is (X*connections+16), where X=6 in tcp proxy mode, X=4 in tampering mode.
 				; its worth to make a reserve with 1.5 multiplier. by default maxfiles is (X*connections)*1.5+16
  --max-orphan-time=<sec>	; if local leg sends something and closes and remote leg is still connecting then cancel connection attempt after N seconds
+
+ --new                          ; begin new strategy
+ --filter-l3=ipv4|ipv6          ; L3 protocol filter. multiple comma separated values allowed.
+ --filter-tcp=[~]port1[-port2]  ; TCP port filter. ~ means negation
+ --filter-l7=[http|tls|unknown] ; L6-L7 protocol filter. multiple comma separated values allowed.
+ --ipset=<filename>             ; ipset include filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
+ --ipset-exclude=<filename>     ; ipset exclude filter (one ip/CIDR per line, ipv4 and ipv6 accepted, gzip supported, multiple ipsets allowed)
 
  --hostlist=<filename>          ; only act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
  --hostlist-exclude=<filename>  ; do not act on hosts in the list (one host per line, subdomains auto apply, gzip supported, multiple hostlists allowed)
@@ -707,11 +751,17 @@ Server replies with it's own MSS in SYN,ACK packet. Usually servers lower their 
 fit to supplied MSS. The greater MSS client sets the bigger server's packets will be.
 If it's enough to split TLS 1.2 ServerHello, it may fool DPI that checks certificate domain name.
 This scheme may significantly lower speed. Hostlist filter is possible only in socks mode if client uses remote resolving (firefox `network.proxy.socks_remote_dns`).
-TLS version filters are not possible.
-`--mss-pf` sets port filter for MSS. Use `mss-pf=443` to apply MSS only for https.
-Likely not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
+`--mss` is not required for TLS1.3. If TLS1.3 is negotiable then MSS make things only worse.
 Use only if nothing better is available. Works only in Linux, not BSD or MacOS.
 
+### multiple strategies
+
+`tpws` supports multiple strategies as well. They work mostly like with `nfqws` with minimal differences.
+`filter-udp` is absent because `tpws` does not support udp. 0-phase desync methods (`--mss`) can work with hostlist in socks modes with remote hostname resolve.
+This is the point where you have to plan profiles carefully. If you use `--mss` and hostlist filters, behaviour can be different depending on remote resolve feature enabled or not.
+Use `--mss` both in hostlist profile and profile without hostlist.
+Use `curl --socks5` and `curl --socks5-hostname` to issue two kinds of proxy queries.
+See `--debug` output to test your setup.
 
 ## Ways to get a list of blocked IP
 
@@ -865,35 +915,104 @@ On openwrt by default `nftables` is selected on `firewall4` based systems.
 
 `FWTYPE=iptables`
 
-Main mode :
+With `nftables` post-NAT scheme is used by default. It allows more DPI attacks on forwarded traffic.
+It's possible to use `iptables`-like pre-NAT scheme. `nfqws` will see client source IPs and display them in logs.
+
+`#POSTNAT=0`
+
+There'are 3 standard options configured separately and independently : `tpws-socks`, `tpws`, `nfqws`.
+They can be used alone or combined. Custom scripts in `init.d/{sysv,openwrt,macos}/custom.d` are always applied.
+
+`tpws-socks` requires daemon parameter configuration but does not require traffic interception.
+Other standard options require also traffic interception.
+Each standard option launches single daemon instance. Strategy differiences are managed using multi-profile scheme.
+Main rule for interception is "intercept required minumum". Everything else only wastes CPU resources and slows down connection.
+
+`--ipset` option is prohibited intentionally to disallow easy to use but ineffective user-mode filtering.
+Use kernel ipsets instead. It may require custom scripts.
+
+To use standard updatable hostlists from the `ipset` dir use `<HOSTLIST>` placeholder. It's automatically replaced
+with hostlist parameters if `MODE_FILTER` variable enables hostlists and is removed otherwise.
+Standard hostlists are expected in final (fallback) strategies closing groups of filter parameters.
+Don't use `<HOSTLIST>` in highly specialized profiles. Use your own filter or hostlist(s).
+
+
+`tpws` socks proxy mode switch
+
+`TPWS_SOCKS_ENABLE=0`
+
+Listening tcp port for `tpws` proxy mode.
+
+`TPPORT_SOCKS=987`
+
+`tpws` socks mode parameters
 
 ```
-tpws - tpws transparent mode
-tpws-socks - tpws socks mode
- binds to localhost and LAN interface (if IFACE_LAN is specified or the system is OpenWRT). port 988
-nfqws - nfqws
-filter - only fill ipset or load hostlist
-custom - use custom script for running daemons and establishing firewall rules
+TPWS_SOCKS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
 ```
 
-`MODE=tpws`
+`tpws` transparent mode switch
 
-Enable http fooling :
+`TPWS_ENABLE=0`
 
-`MODE_HTTP=1`
+`tpws` transparent mode target ports
 
-Apply fooling to keep alive http sessions. Only applicable to nfqws. Tpws always fool keepalives.
-Not enabling this can save CPU time.
+`TPWS_PORTS=80,443`
 
-`MODE_HTTP_KEEPALIVE=0`
+`tpws` transparent mode parameters
 
-Enable https fooling :
+```
+TPWS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-tls=sni --disorder <HOSTLIST>
+"
+```
 
-`MODE_HTTPS=1`
+`nfqws` enable switch
 
-Enable quic fooling :
+`NFQWS_ENABLE=0`
 
-`MODE_QUIC=1`
+`nfqws` port targets for `connbytes`-limited interception. `connbytes` allows to intercept only starting packets from connections.
+This is more effective kernel-mode alternative to `nfqws --dpi-desync-cutoff=nX`.
+
+```
+NFQWS_PORTS_TCP=80,443
+NFQWS_PORTS_UDP=443
+```
+
+How many starting packets should be intercepted to nfqws in each direction
+
+```
+NFQWS_TCP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_TCP_PKT_IN=3
+NFQWS_UDP_PKT_OUT=$((6+$AUTOHOSTLIST_RETRANS_THRESHOLD))
+NFQWS_UDP_PKT_IN=0
+```
+
+There's kind of traffic that requires interception of entire outgoing stream.
+Typically it's support for plain http keepalives and stateless DPI.
+This mode of interception significantly increases CPU utilization. Use with care and only if required.
+Here you specify port numbers for unlimited interception.
+It's advised also to remove these ports from `connbytes`-limited interception list.
+
+```
+#NFQWS_PORTS_TCP_KEEPALIVE=80
+#NFQWS_PORTS_UDP_KEEPALIVE=
+```
+
+`nfqws` parameters
+
+```
+NFQWS_OPT="
+--filter-tcp=80 --dpi-desync=fake,split2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-tcp=443 --dpi-desync=fake,disorder2 --dpi-desync-fooling=md5sig <HOSTLIST> --new
+--filter-udp=443 --dpi-desync=fake --dpi-desync-repeats=6 <HOSTLIST>
+"
+```
+
 
 Host filtering mode :
 ```
@@ -904,43 +1023,6 @@ autohostlist - hostlist mode + blocks auto detection
 ```
 
 `MODE_FILTER=none`
-
-Its possible to change manipulation options used by tpws :
-
-`TPWS_OPT="--hostspell=HOST --split-http-req=method --split-pos=3"`
-
-nfqws options for DPI desync attack:
-
-```
-DESYNC_MARK=0x40000000
-DESYNC_MARK_POSTNAT=0x20000000
-NFQWS_OPT_DESYNC="--dpi-desync=fake --dpi-desync-ttl=0 --dpi-desync-fooling=badsum --dpi-desync-fwmark=$DESYNC_MARK"
-```
-
-Separate nfqws options for http and https and ip protocol versions 4,6:
-
-```
-NFQWS_OPT_DESYNC_HTTP="--dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
-NFQWS_OPT_DESYNC_HTTPS="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=0 --dpi-desync-fooling=badsum"
-NFQWS_OPT_DESYNC_HTTP6="--dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
-NFQWS_OPT_DESYNC_HTTPS6="--wssize=1:6 --dpi-desync=split --dpi-desync-ttl=5 --dpi-desync-fooling=none"
-```
-
-If one of `NFQWS_OPT_DESYNC_HTTP`/`NFQWS_OPT_DESYNC_HTTPS` is not defined it takes value of NFQWS_OPT_DESYNC.
-If one of `NFQWS_OPT_DESYNC_HTTP6`/`NFQWS_OPT_DESYNC_HTTPS6` is not defined it takes value from
-`NFQWS_OPT_DESYNC_HTTP`/`NFQWS_OPT_DESYNC_HTTPS`.
-It means if only `NFQWS_OPT_DESYNC` is defined all four take its value.
-
-If a variable is not defined, the value `NFQWS_OPT_DESYNC` is taken.
-
-Separate QUIC options for ip protocol versions :
-
-```
-NFQWS_OPT_DESYNC_QUIC="--dpi-desync=fake"
-NFQWS_OPT_DESYNC_QUIC6="--dpi-desync=hopbyhop"
-```
-
-If `NFQWS_OPT_DESYNC_QUIC6` is not specified `NFQWS_OPT_DESYNC_QUIC` is taken.
 
 
 flow offloading control (if supported)
@@ -1138,6 +1220,8 @@ The best way to start is to put zapret dir to `/tmp` and run `/tmp/zapret/instal
 After installation remove `/tmp/zapret` to free RAM.
 
 The absolute minimum for openwrt is 64/8 system, 64/16 is comfortable, 128/extroot is recommended.
+
+For low storage openwrt see `init.d/openwrt-minimal`.
 
 ### Android
 

@@ -293,7 +293,7 @@ netcat_test()
 	# $2 - port
 	local cmd
 	netcat_setup && {
-		cmd="$NCAT -z -w 1 $1 $2"
+		cmd="$NCAT -z -w 2 $1 $2"
 		echo $cmd
 		$cmd 2>&1
 	}
@@ -346,6 +346,26 @@ check_system()
 	esac
 	echo $UNAME${SUBSYS:+/$SUBSYS} detected
 	echo firewall type is $FWTYPE
+}
+
+zp_already_running()
+{
+	case "$UNAME" in
+		CYGWIN)
+			win_process_exists $PKTWSD || win_process_exists goodbyedpi
+			;;
+		*)
+			process_exists $PKTWSD || process_exists tpws
+	esac
+}
+check_already()
+{
+	echo \* checking already running zapret processes
+	if zp_already_running; then
+		echo "!!! WARNING. some dpi bypass processes already running !!!"
+		echo "!!! WARNING. blockcheck requires all DPI bypass methods disabled !!!"
+		echo "!!! WARNING. pls stop all dpi bypass instances that may interfere with blockcheck !!!"
+	fi
 }
 
 freebsd_module_loaded()
@@ -869,6 +889,7 @@ ws_curl_test()
 	# $2 - test function
 	# $3 - domain
 	# $4,$5,$6, ... - ws params
+
 	local code ws_start=$1 testf=$2 dom=$3
 	shift
 	shift
@@ -884,17 +905,17 @@ tpws_curl_test()
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - tpws params
-	echo - checking tpws $3 $4 $5 $6 $7 $8 $9
+	echo - checking tpws $3 $4 $5 $6 $7 $8 $9 $TPWS_EXTRA "$TPWS_EXTRA_1" "$TPWS_EXTRA_2" "$TPWS_EXTRA_3" "$TPWS_EXTRA_4" "$TPWS_EXTRA_5" "$TPWS_EXTRA_6" "$TPWS_EXTRA_7" "$TPWS_EXTRA_8" "$TPWS_EXTRA_9"
 	local ALL_PROXY="socks5://127.0.0.1:$SOCKS_PORT"
-	ws_curl_test tpws_start "$@"
+	ws_curl_test tpws_start "$@" $TPWS_EXTRA "$TPWS_EXTRA_1" "$TPWS_EXTRA_2" "$TPWS_EXTRA_3" "$TPWS_EXTRA_4" "$TPWS_EXTRA_5" "$TPWS_EXTRA_6" "$TPWS_EXTRA_7" "$TPWS_EXTRA_8" "$TPWS_EXTRA_9"
 }
 pktws_curl_test()
 {
 	# $1 - test function
 	# $2 - domain
 	# $3,$4,$5, ... - nfqws/dvtws params
-	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9
-	ws_curl_test pktws_start "$@"
+	echo - checking $PKTWSD ${WF:+$WF }$3 $4 $5 $6 $7 $8 $9 $PKTWS_EXTRA "$PKTWS_EXTRA_1" "$PKTWS_EXTRA_2" "$PKTWS_EXTRA_3" "$PKTWS_EXTRA_4" "$PKTWS_EXTRA_5" "$PKTWS_EXTRA_6" "$PKTWS_EXTRA_7" "$PKTWS_EXTRA_8" "$PKTWS_EXTRA_9"
+	ws_curl_test pktws_start "$@" $PKTWS_EXTRA "$PKTWS_EXTRA_1" "$PKTWS_EXTRA_2" "$PKTWS_EXTRA_3" "$PKTWS_EXTRA_4" "$PKTWS_EXTRA_5" "$PKTWS_EXTRA_6" "$PKTWS_EXTRA_7" "$PKTWS_EXTRA_8" "$PKTWS_EXTRA_9"
 }
 xxxws_curl_test_update()
 {
@@ -943,6 +964,8 @@ report_strategy()
 	# $3 - daemon
 	echo
 	if [ -n "$strategy" ]; then
+		# trim spaces at the end
+		strategy="$(echo "$strategy" | xargs)"
 		echo "!!!!! $1: working strategy found for ipv${IPV} $2 : $3 $strategy !!!!!"
 		echo
 		report_append "ipv${IPV} $2 $1 : $3 ${WF:+$WF }$strategy"
@@ -1150,6 +1173,7 @@ pktws_check_domain_http_bypass()
 
 	local strategy
 	pktws_check_domain_http_bypass_ "$@"
+	strategy="${strategy:+$strategy $PKTWS_EXTRA $PKTWS_EXTRA_1 $PKTWS_EXTRA_2 $PKTWS_EXTRA_3 $PKTWS_EXTRA_4 $PKTWS_EXTRA_5 $PKTWS_EXTRA_6 $PKTWS_EXTRA_7 $PKTWS_EXTRA_8 $PKTWS_EXTRA_9}"
 	report_strategy $1 $3 $PKTWSD
 }
 
@@ -1194,6 +1218,7 @@ pktws_check_domain_http3_bypass()
 
 	local strategy
 	pktws_check_domain_http3_bypass_ "$@"
+	strategy="${strategy:+$strategy $PKTWS_EXTRA $PKTWS_EXTRA_1 $PKTWS_EXTRA_2 $PKTWS_EXTRA_3 $PKTWS_EXTRA_4 $PKTWS_EXTRA_5 $PKTWS_EXTRA_6 $PKTWS_EXTRA_7 $PKTWS_EXTRA_8 $PKTWS_EXTRA_9}"
 	report_strategy $1 $2 $PKTWSD
 }
 warn_mss()
@@ -1224,7 +1249,7 @@ tpws_check_domain_http_bypass_()
 		done
 	else
 		for mss in '' 88; do
-			s3=${mss:+--mss=$mss --mss-pf=$HTTPS_PORT}
+			s3=${mss:+--mss=$mss}
 			for s2 in '' '--oob' '--disorder' '--oob --disorder'; do
 				for pos in sni sniext; do
 					s="--split-tls=$pos"
@@ -1263,6 +1288,7 @@ tpws_check_domain_http_bypass()
 
 	local strategy
 	tpws_check_domain_http_bypass_ "$@"
+	strategy="${strategy:+$strategy $TPWS_EXTRA $TPWS_EXTRA_1 $TPWS_EXTRA_2 $TPWS_EXTRA_3 $TPWS_EXTRA_4 $TPWS_EXTRA_5 $TPWS_EXTRA_6 $TPWS_EXTRA_7 $TPWS_EXTRA_8 $TPWS_EXTRA_9}"
 	report_strategy $1 $3 tpws
 }
 
@@ -1795,6 +1821,7 @@ sigsilent()
 fsleep_setup
 fix_sbin_path
 check_system
+check_already
 [ "$UNAME" = CYGWIN ] || require_root
 check_prerequisites
 trap sigint_cleanup INT

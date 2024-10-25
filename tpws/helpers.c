@@ -11,6 +11,12 @@
 #include <time.h>
 #include <sys/stat.h>
 
+void rtrim(char *s)
+{
+	if (s)
+		for (char *p = s + strlen(s) - 1; p >= s && (*p == '\n' || *p == '\r'); p--) *p = '\0';
+}
+
 char *strncasestr(const char *s,const char *find, size_t slen)
 {
 	char c, sc;
@@ -80,7 +86,6 @@ void print_sockaddr(const struct sockaddr *sa)
 	ntop46_port(sa,ip_port,sizeof(ip_port));
 	printf("%s",ip_port);
 }
-
 
 // -1 = error,  0 = not local, 1 = local
 bool check_local_ip(const struct sockaddr *saddr)
@@ -164,6 +169,25 @@ bool saconvmapped(struct sockaddr_storage *a)
 	return false;
 }
 
+void sacopy(struct sockaddr_storage *sa_dest, const struct sockaddr *sa)
+{
+	switch(sa->sa_family)
+	{
+		case AF_INET:
+			memcpy(sa_dest,sa,sizeof(struct sockaddr_in));
+			break;
+		case AF_INET6:
+			memcpy(sa_dest,sa,sizeof(struct sockaddr_in6));
+			break;
+		default:
+			sa_dest->ss_family = 0;
+	}
+}
+void sa46copy(sockaddr_in46 *sa_dest, const struct sockaddr *sa)
+{
+	sacopy((struct sockaddr_storage*)sa_dest, sa);
+}
+
 bool is_localnet(const struct sockaddr *a)
 {
 	// match 127.0.0.0/8, 0.0.0.0, ::1, ::0, :ffff:127.0.0.0/104, :ffff:0.0.0.0
@@ -241,27 +265,128 @@ bool pf_in_range(uint16_t port, const port_filter *pf)
 bool pf_parse(const char *s, port_filter *pf)
 {
 	unsigned int v1,v2;
+	char c;
 
 	if (!s) return false;
-	if (*s=='~') 
+	if (*s=='~')
 	{
 		pf->neg=true;
 		s++;
 	}
 	else
 		pf->neg=false;
-	if (sscanf(s,"%u-%u",&v1,&v2)==2)
+	if (sscanf(s,"%u-%u%c",&v1,&v2,&c)==2)
 	{
-		if (!v1 || v1>65535 || v2>65535 || v1>v2) return false;
+		if (v1>65535 || v2>65535 || v1>v2) return false;
 		pf->from=(uint16_t)v1;
 		pf->to=(uint16_t)v2;
 	}
-	else if (sscanf(s,"%u",&v1)==1)
+	else if (sscanf(s,"%u%c",&v1,&c)==1)
 	{
-		if (!v1 || v1>65535) return false;
+		if (v1>65535) return false;
 		pf->to=pf->from=(uint16_t)v1;
 	}
 	else
 		return false;
+	// deny all case
+	if (!pf->from && !pf->to) pf->neg=true;
 	return true;
+}
+bool pf_is_empty(const port_filter *pf)
+{
+	return !pf->neg && !pf->from && !pf->to;
+}
+
+
+static void mask_from_preflen6_make(uint8_t plen, struct in6_addr *a)
+{
+	if (plen >= 128)
+		memset(a->s6_addr,0xFF,16);
+	else
+	{
+		uint8_t n = plen >> 3;
+		memset(a->s6_addr,0xFF,n);
+		memset(a->s6_addr+n,0x00,16-n);
+		a->s6_addr[n] = (uint8_t)(0xFF00 >> (plen & 7));
+	}
+}
+struct in6_addr ip6_mask[129];
+void mask_from_preflen6_prepare(void)
+{
+	for (int plen=0;plen<=128;plen++) mask_from_preflen6_make(plen, ip6_mask+plen);
+}
+
+#if defined(__GNUC__) && !defined(__llvm__)
+__attribute__((optimize ("no-strict-aliasing")))
+#endif
+void ip6_and(const struct in6_addr * restrict a, const struct in6_addr * restrict b, struct in6_addr * restrict result)
+{
+	// int 128 can cause alignment segfaults because sin6_addr in struct sockaddr_in6 is 8-byte aligned, not 16-byte
+	((uint64_t*)result->s6_addr)[0] = ((uint64_t*)a->s6_addr)[0] & ((uint64_t*)b->s6_addr)[0];
+	((uint64_t*)result->s6_addr)[1] = ((uint64_t*)a->s6_addr)[1] & ((uint64_t*)b->s6_addr)[1];
+}
+
+void str_cidr4(char *s, size_t s_len, const struct cidr4 *cidr)
+{
+	char s_ip[16];
+	*s_ip=0;
+	inet_ntop(AF_INET, &cidr->addr, s_ip, sizeof(s_ip));
+	snprintf(s,s_len,cidr->preflen<32 ? "%s/%u" : "%s", s_ip, cidr->preflen);
+}
+void print_cidr4(const struct cidr4 *cidr)
+{
+	char s[19];
+	str_cidr4(s,sizeof(s),cidr);
+	printf("%s",s);
+}
+void str_cidr6(char *s, size_t s_len, const struct cidr6 *cidr)
+{
+	char s_ip[40];
+	*s_ip=0;
+	inet_ntop(AF_INET6, &cidr->addr, s_ip, sizeof(s_ip));
+	snprintf(s,s_len,cidr->preflen<128 ? "%s/%u" : "%s", s_ip, cidr->preflen);
+}
+void print_cidr6(const struct cidr6 *cidr)
+{
+	char s[44];
+	str_cidr6(s,sizeof(s),cidr);
+	printf("%s",s);
+}
+bool parse_cidr4(char *s, struct cidr4 *cidr)
+{
+	char *p,d;
+	bool b;
+	unsigned int plen;
+
+	if ((p = strchr(s, '/')))
+	{
+		if (sscanf(p + 1, "%u", &plen)!=1 || plen>32)
+			return false;
+		cidr->preflen = (uint8_t)plen;
+		d=*p; *p=0; // backup char
+	}
+	else
+		cidr->preflen = 32;
+	b = (inet_pton(AF_INET, s, &cidr->addr)==1);
+	if (p) *p=d; // restore char
+	return b;
+}
+bool parse_cidr6(char *s, struct cidr6 *cidr)
+{
+	char *p,d;
+	bool b;
+	unsigned int plen;
+
+	if ((p = strchr(s, '/')))
+	{
+		if (sscanf(p + 1, "%u", &plen)!=1 || plen>128)
+			return false;
+		cidr->preflen = (uint8_t)plen;
+		d=*p; *p=0; // backup char
+	}
+	else
+		cidr->preflen = 128;
+	b = (inet_pton(AF_INET6, s, &cidr->addr)==1);
+	if (p) *p=d; // restore char
+	return b;
 }

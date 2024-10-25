@@ -5,6 +5,7 @@
 #include "params.h"
 #include "helpers.h"
 #include "hostlist.h"
+#include "ipset.h"
 #include "conntrack.h"
 
 #include <string.h>
@@ -15,21 +16,62 @@ const char *fake_http_request_default = "GET / HTTP/1.1\r\nHost: www.iana.org\r\
                                         "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\r\n"
                                         "Accept-Encoding: gzip, deflate, br\r\n\r\n";
 
-const uint8_t fake_tls_clienthello_default[517] = {
-  0x16, 0x03, 0x01, 0x02, 0x00, 0x01, 0x00, 0x01, 0xFC, 0x03, 0x03, 0x6F, 0x0B, 0xB6, 0x85, 0x58, 0x28, 0x59, 0xD5, 0x0D, 0x6C, 0x78, 0x39, 0x7F, 0x2B, 0x0B, 0x45, 0xA3, 0x71, 0x4F, 0x49, 0xD6, 0x34, 0x17, 0xC6, 0x59, 0xA5, 0x1D, 0x89, 0x01,
-  0xE1, 0x72, 0x1D, 0x20, 0x9D, 0x2C, 0xAB, 0x26, 0x58, 0xA7, 0x83, 0xBF, 0xB7, 0xDC, 0x5F, 0x28, 0xAA, 0x11, 0xA7, 0x63, 0x54, 0x19, 0xCB, 0xC6, 0xC4, 0x0E, 0xA4, 0x15, 0x46, 0xCC, 0x2F, 0x25, 0x13, 0x9A, 0x14, 0x54, 0x00, 0x3E, 0x13, 0x02,
-  0x13, 0x03, 0x13, 0x01, 0xC0, 0x2C, 0xC0, 0x30, 0x00, 0x9F, 0xCC, 0xA9, 0xCC, 0xA8, 0xCC, 0xAA, 0xC0, 0x2B, 0xC0, 0x2F, 0x00, 0x9E, 0xC0, 0x24, 0xC0, 0x28, 0x00, 0x6B, 0xC0, 0x23, 0xC0, 0x27, 0x00, 0x67, 0xC0, 0x0A, 0xC0, 0x14, 0x00, 0x39,
-  0xC0, 0x09, 0xC0, 0x13, 0x00, 0x33, 0x00, 0x9D, 0x00, 0x9C, 0x00, 0x3D, 0x00, 0x3C, 0x00, 0x35, 0x00, 0x2F, 0x00, 0xFF, 0x01, 0x00, 0x01, 0x75, 0x00, 0x00, 0x00, 0x0D, 0x00, 0x0B, 0x00, 0x00, 0x08, 0x69, 0x61, 0x6E, 0x61, 0x2E, 0x6F, 0x72,
-  0x67, 0x00, 0x0B, 0x00, 0x04, 0x03, 0x00, 0x01, 0x02, 0x00, 0x0A, 0x00, 0x0C, 0x00, 0x0A, 0x00, 0x1D, 0x00, 0x17, 0x00, 0x1E, 0x00, 0x19, 0x00, 0x18, 0x33, 0x74, 0x00, 0x00, 0x00, 0x10, 0x00, 0x0E, 0x00, 0x0C, 0x02, 0x68, 0x32, 0x08, 0x68,
-  0x74, 0x74, 0x70, 0x2F, 0x31, 0x2E, 0x31, 0x00, 0x16, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00, 0x31, 0x00, 0x00, 0x00, 0x0D, 0x00, 0x30, 0x00, 0x2E, 0x04, 0x03, 0x05, 0x03, 0x06, 0x03, 0x08, 0x07, 0x08, 0x08, 0x08, 0x09, 0x08, 0x0A, 0x08,
-  0x0B, 0x08, 0x04, 0x08, 0x05, 0x08, 0x06, 0x04, 0x01, 0x05, 0x01, 0x06, 0x01, 0x03, 0x03, 0x02, 0x03, 0x03, 0x01, 0x02, 0x01, 0x03, 0x02, 0x02, 0x02, 0x04, 0x02, 0x05, 0x02, 0x06, 0x02, 0x00, 0x2B, 0x00, 0x09, 0x08, 0x03, 0x04, 0x03, 0x03,
-  0x03, 0x02, 0x03, 0x01, 0x00, 0x2D, 0x00, 0x02, 0x01, 0x01, 0x00, 0x33, 0x00, 0x26, 0x00, 0x24, 0x00, 0x1D, 0x00, 0x20, 0x1B, 0xB3, 0xF5, 0x23, 0x6E, 0x05, 0x98, 0x5D, 0x92, 0x30, 0x8A, 0xAC, 0x64, 0x61, 0x1F, 0xD7, 0x0A, 0x6D, 0xB1, 0xA5,
-  0x74, 0xF9, 0x44, 0x07, 0xC0, 0x55, 0xD8, 0x8B, 0x0C, 0xEA, 0x29, 0x27, 0x00, 0x15, 0x00, 0xB5, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+// random : +11 size 32
+// random : +44 size 32
+// sni : gatech.edu +125 size 11
+const uint8_t fake_tls_clienthello_default[648] = {
+0x16,0x03,0x01,0x02,0x83,0x01,0x00,0x02,0x7f,0x03,0x03,0x98,0xfb,0x69,0x1d,0x31,
+0x66,0xc4,0xd8,0x07,0x25,0x2b,0x74,0x47,0x01,0x44,0x09,0x08,0xcf,0x13,0x67,0xe0,
+0x46,0x19,0x1f,0xcb,0xee,0xe6,0x8e,0x33,0xb9,0x91,0xa0,0x20,0xf2,0xed,0x56,0x73,
+0xa4,0x0a,0xce,0xa6,0xad,0xd2,0xfd,0x71,0xb8,0xb9,0xfd,0x06,0x0e,0xdd,0xf0,0x57,
+0x37,0x7d,0x96,0xb5,0x80,0x6e,0x54,0xe2,0x15,0xce,0x5f,0xff,0x00,0x22,0x13,0x01,
+0x13,0x03,0x13,0x02,0xc0,0x2b,0xc0,0x2f,0xcc,0xa9,0xcc,0xa8,0xc0,0x2c,0xc0,0x30,
+0xc0,0x0a,0xc0,0x09,0xc0,0x13,0xc0,0x14,0x00,0x9c,0x00,0x9d,0x00,0x2f,0x00,0x35,
+0x01,0x00,0x02,0x14,0x00,0x00,0x00,0x0f,0x00,0x0d,0x00,0x00,0x0a,0x67,0x61,0x74,
+0x65,0x63,0x68,0x2e,0x65,0x64,0x75,0x00,0x17,0x00,0x00,0xff,0x01,0x00,0x01,0x00,
+0x00,0x0a,0x00,0x0e,0x00,0x0c,0x00,0x1d,0x00,0x17,0x00,0x18,0x00,0x19,0x01,0x00,
+0x01,0x01,0x00,0x0b,0x00,0x02,0x01,0x00,0x00,0x10,0x00,0x0e,0x00,0x0c,0x02,0x68,
+0x32,0x08,0x68,0x74,0x74,0x70,0x2f,0x31,0x2e,0x31,0x00,0x05,0x00,0x05,0x01,0x00,
+0x00,0x00,0x00,0x00,0x22,0x00,0x0a,0x00,0x08,0x04,0x03,0x05,0x03,0x06,0x03,0x02,
+0x03,0x00,0x33,0x00,0x6b,0x00,0x69,0x00,0x1d,0x00,0x20,0x72,0xe5,0xce,0x58,0x31,
+0x3c,0x08,0xaa,0x2f,0xa8,0x40,0xe7,0x7a,0xdf,0x46,0x5b,0x63,0x62,0xc7,0xfa,0x49,
+0x18,0xac,0xa1,0x00,0x7c,0x42,0xc5,0x02,0x94,0x5c,0x44,0x00,0x17,0x00,0x41,0x04,
+0x8f,0x3e,0x5f,0xd4,0x7f,0x37,0x47,0xd3,0x33,0x70,0x38,0x7f,0x11,0x35,0xc1,0x55,
+0x8a,0x6c,0xc7,0x5a,0xd4,0xf7,0x31,0xbb,0x9e,0xee,0xd1,0x8f,0x74,0xdd,0x9b,0xbb,
+0x91,0xa1,0x72,0xda,0xeb,0xf6,0xc6,0x82,0x84,0xfe,0xb7,0xfd,0x7b,0xe1,0x9f,0xd2,
+0xb9,0x3e,0x83,0xa6,0x9c,0xac,0x81,0xe2,0x00,0xd5,0x19,0x55,0x91,0xa7,0x0c,0x29,
+0x00,0x2b,0x00,0x05,0x04,0x03,0x04,0x03,0x03,0x00,0x0d,0x00,0x18,0x00,0x16,0x04,
+0x03,0x05,0x03,0x06,0x03,0x08,0x04,0x08,0x05,0x08,0x06,0x04,0x01,0x05,0x01,0x06,
+0x01,0x02,0x03,0x02,0x01,0x00,0x1c,0x00,0x02,0x40,0x01,0xfe,0x0d,0x01,0x19,0x00,
+0x00,0x01,0x00,0x01,0xfe,0x00,0x20,0xae,0x8b,0x30,0x3c,0xf0,0xa9,0x0d,0xa1,0x69,
+0x95,0xb8,0xe2,0xed,0x08,0x6d,0x48,0xdf,0xf7,0x5b,0x9d,0x66,0xef,0x15,0x97,0xbc,
+0x2c,0x99,0x91,0x12,0x7a,0x35,0xd0,0x00,0xef,0xb1,0x8d,0xff,0x61,0x57,0x52,0xef,
+0xd6,0xea,0xbf,0xf3,0x6d,0x78,0x14,0x38,0xff,0xeb,0x58,0xe8,0x9d,0x59,0x4b,0xd5,
+0x9f,0x59,0x12,0xf9,0x03,0x9a,0x20,0x37,0x85,0x77,0xb1,0x4c,0xd8,0xef,0xa6,0xc8,
+0x54,0x8d,0x07,0x27,0x95,0xce,0xd5,0x37,0x4d,0x69,0x18,0xd4,0xfd,0x5e,0xdf,0x64,
+0xcc,0x10,0x2f,0x7f,0x0e,0xc9,0xfd,0xd4,0xd0,0x18,0x61,0x1b,0x57,0x8f,0x41,0x7f,
+0x6f,0x4f,0x5c,0xad,0x04,0xc6,0x5e,0x74,0x54,0x87,0xba,0x28,0xe6,0x11,0x0b,0x9d,
+0x3f,0x0b,0x6d,0xf4,0x2d,0xfc,0x31,0x4e,0xfd,0x49,0xe7,0x15,0x96,0xaf,0xee,0x9a,
+0x48,0x1b,0xae,0x5e,0x7c,0x20,0xbe,0xb4,0xec,0x68,0xb6,0x74,0x22,0xa0,0xec,0xff,
+0x19,0x96,0xe4,0x10,0x8f,0x3c,0x91,0x88,0xa1,0xcc,0x78,0xef,0x4e,0x0e,0xe3,0xb6,
+0x57,0x8c,0x33,0xef,0xaa,0xb0,0x1d,0x45,0x1c,0x02,0x4c,0xe2,0x80,0x30,0xe8,0x48,
+0x7a,0x09,0x71,0x94,0x7c,0xb6,0x75,0x81,0x1c,0xae,0xe3,0x3f,0xde,0xea,0x2b,0x45,
+0xcc,0xe3,0x64,0x09,0xf7,0x60,0x26,0x0c,0x7d,0xad,0x55,0x65,0xb6,0xf5,0x85,0x04,
+0x64,0x2f,0x97,0xd0,0x6a,0x06,0x36,0xcd,0x25,0xda,0x51,0xab,0xd6,0xf7,0x5e,0xeb,
+0xd4,0x03,0x39,0xa4,0xc4,0x2a,0x9c,0x17,0xe8,0xb0,0x9f,0xc0,0xd3,0x8c,0x76,0xdd,
+0xa1,0x0b,0x76,0x9f,0x23,0xfa,0xed,0xfb,0xd7,0x78,0x0f,0x00,0xf7,0x45,0x03,0x04,
+0x84,0x66,0x6b,0xec,0xc7,0xed,0xbc,0xe4
 };
+
+static const char * tld[]={"com","org","net","edu","gov","biz"};
+void randomize_default_tls_payload(uint8_t *p)
+{
+	fill_random_bytes(p+11,32);
+	fill_random_bytes(p+44,32);
+	fill_random_az(p+125,1);
+	fill_random_az09(p+126,5);
+	memcpy(p+132,tld[random()%(sizeof(tld)/sizeof(*tld))],3);
+}
 
 #define PKTDATA_MAXDUMP 32
 #define IP_MAXDUMP 80
@@ -40,7 +82,6 @@ void desync_init(void)
 {
 	memset(zeropkt, 0, sizeof(zeropkt));
 }
-
 
 bool desync_valid_zero_stage(enum dpi_desync_mode mode)
 {
@@ -105,11 +146,82 @@ enum dpi_desync_mode desync_mode_from_string(const char *s)
 	return DESYNC_INVALID;
 }
 
+static bool dp_match_l3l4(struct desync_profile *dp, uint8_t l3proto, const struct sockaddr *dest)
+{
+	return  ((dest->sa_family==AF_INET && dp->filter_ipv4) || (dest->sa_family==AF_INET6 && dp->filter_ipv6)) &&
+		(l3proto==IPPROTO_TCP && pf_in_range(saport(dest), &dp->pf_tcp) || l3proto==IPPROTO_UDP && pf_in_range(saport(dest), &dp->pf_udp)) &&
+		IpsetCheck(dp, dest->sa_family==AF_INET ? &((struct sockaddr_in*)dest)->sin_addr : NULL, dest->sa_family==AF_INET6 ? &((struct sockaddr_in6*)dest)->sin6_addr : NULL);
+}
+static bool dp_impossible(struct desync_profile *dp, const char *hostname, t_l7proto l7proto)
+{
+	return	!PROFILE_IPSETS_EMPTY(dp) &&
+		((dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7)) || (!*dp->hostlist_auto_filename && !hostname && (dp->hostlist || dp->hostlist_exclude)));
+}
+
+static bool dp_match(
+	struct desync_profile *dp,
+	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
+	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
+{
+	if (bCheckDone) *bCheckDone = false;
+	// impossible case, hard filter
+	// impossible check avoids relatively slow ipset search
+	if (!dp_impossible(dp,hostname,l7proto) && dp_match_l3l4(dp,l3proto,dest))
+	{
+		// soft filter
+		if (dp->filter_l7 && !l7_proto_match(l7proto, dp->filter_l7))
+			return false;
+
+		// autohostlist profile matching l3/l4 filter always win
+		if (*dp->hostlist_auto_filename) return true;
+
+		if (dp->hostlist || dp->hostlist_exclude)
+		{
+			// without known hostname first profile matching l3/l4 filter and without hostlist filter wins
+			if (hostname)
+			{
+				if (bCheckDone) *bCheckDone = true;
+				bool b;
+				b = HostlistCheck(dp, hostname, bExcluded);
+				if (bCheckResult) *bCheckResult = b;
+				return b;
+			}
+		}
+		else
+			// profile without hostlist filter wins
+			return true;
+	}
+	return false;
+}
+static struct desync_profile *dp_find(
+	struct desync_profile_list_head *head,
+	uint8_t l3proto, const struct sockaddr *dest, const char *hostname, t_l7proto l7proto,
+	bool *bCheckDone, bool *bCheckResult, bool *bExcluded)
+{
+	struct desync_profile_list *dpl;
+	if (params.debug)
+	{
+		char ip_port[48];
+		ntop46_port(dest, ip_port,sizeof(ip_port));
+		DLOG("desync profile search for %s target=%s l7proto=%s hostname='%s'\n", proto_name(l3proto), ip_port, l7proto_str(l7proto), hostname ? hostname : "");
+	}
+	if (bCheckDone) *bCheckDone = false;
+	LIST_FOREACH(dpl, head, next)
+	{
+		if (dp_match(&dpl->dp,l3proto,dest,hostname,l7proto,bCheckDone,bCheckResult,bExcluded))
+		{
+			DLOG("desync profile %d matches\n",dpl->dp.n);
+			return &dpl->dp;
+		}
+	}
+	DLOG("desync profile not found\n");
+	return NULL;
+}
 
 // auto creates internal socket and uses it for subsequent calls
-static bool rawsend_rep(const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len)
+static bool rawsend_rep(int repeats, const struct sockaddr* dst,uint32_t fwmark,const char *ifout,const void *data,size_t len)
 {
-	for (int i=0;i<params.desync_repeats;i++)
+	for (int i=0;i<repeats;i++)
 		if (!rawsend(dst,fwmark,ifout,data,len))
 			return false;
 	return true;
@@ -132,20 +244,25 @@ static bool cutoff_test(const t_ctrack *ctrack, uint64_t cutoff, char mode)
 }
 static void maybe_cutoff(t_ctrack *ctrack, uint8_t proto)
 {
-	if (ctrack)
+	if (ctrack && ctrack->dp)
 	{
 		if (proto==IPPROTO_TCP)
-			ctrack->b_wssize_cutoff |= cutoff_test(ctrack, params.wssize_cutoff, params.wssize_cutoff_mode);
-		ctrack->b_desync_cutoff |= cutoff_test(ctrack, params.desync_cutoff, params.desync_cutoff_mode);
+			ctrack->b_wssize_cutoff |= cutoff_test(ctrack, ctrack->dp->wssize_cutoff, ctrack->dp->wssize_cutoff_mode);
+		ctrack->b_desync_cutoff |= cutoff_test(ctrack, ctrack->dp->desync_cutoff, ctrack->dp->desync_cutoff_mode);
 
+		// in MULTI STRATEGY concept conntrack entry holds desync profile
+		// we do not want to remove conntrack entries ASAP anymore
+
+		/*
 		// we do not need conntrack entry anymore if all cutoff conditions are either not defined or reached
 		// do not drop udp entry because it will be recreated when next packet arrives
 		if (proto==IPPROTO_TCP)
 			ctrack->b_cutoff |= \
-			    (!params.wssize || ctrack->b_wssize_cutoff) &&
-			    (!params.desync_cutoff || ctrack->b_desync_cutoff) &&
+			    (!ctrack->dp->wssize || ctrack->b_wssize_cutoff) &&
+			    (!ctrack->dp->desync_cutoff || ctrack->b_desync_cutoff) &&
 			    (!ctrack->hostname_ah_check || ctrack->req_retrans_counter==RETRANS_COUNTER_STOP) &&
 			    ReasmIsEmpty(&ctrack->reasm_orig);
+		*/
 	}
 }
 static void wssize_cutoff(t_ctrack *ctrack)
@@ -158,7 +275,7 @@ static void wssize_cutoff(t_ctrack *ctrack)
 }
 static void forced_wssize_cutoff(t_ctrack *ctrack)
 {
- 	if (ctrack && params.wssize && !ctrack->b_wssize_cutoff)
+ 	if (ctrack && ctrack->dp && ctrack->dp->wssize && !ctrack->b_wssize_cutoff)
 	{
 		DLOG("forced wssize-cutoff\n");
 		wssize_cutoff(ctrack);
@@ -174,26 +291,26 @@ static void ctrack_stop_retrans_counter(t_ctrack *ctrack)
 	}
 }
 
-static void auto_hostlist_reset_fail_counter(const char *hostname)
+static void auto_hostlist_reset_fail_counter(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	if (hostname)
 	{
 		hostfail_pool *fail_counter;
 	
-		fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+		fail_counter = HostFailPoolFind(dp->hostlist_auto_fail_counters, hostname);
 		if (fail_counter)
 		{
-			HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
-			DLOG("auto hostlist : %s : fail counter reset. website is working.\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : fail counter reset. website is working.", hostname);
+			HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
+			DLOG("auto hostlist (profile %d) : %s : fail counter reset. website is working.\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter reset. website is working.", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
 // return true if retrans trigger fires
-static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold)
+static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int threshold, const char *client_ip_port, t_l7proto l7proto)
 {
-	if (ctrack && ctrack->hostname_ah_check && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
+	if (ctrack && ctrack->dp && ctrack->hostname_ah_check && ctrack->req_retrans_counter!=RETRANS_COUNTER_STOP)
 	{
 		if (l4proto==IPPROTO_TCP)
 		{
@@ -203,7 +320,7 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 			{
 				DLOG("req retrans : tcp seq %u not within the req range %u-%u. stop tracking.\n", ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end);
 				ctrack_stop_retrans_counter(ctrack);
-				auto_hostlist_reset_fail_counter(ctrack->hostname);
+				auto_hostlist_reset_fail_counter(ctrack->dp, ctrack->hostname, client_ip_port, l7proto);
 				return false;
 			}
 		}
@@ -218,60 +335,65 @@ static bool auto_hostlist_retrans(t_ctrack *ctrack, uint8_t l4proto, int thresho
 	}
 	return false;
 }
-static void auto_hostlist_failed(const char *hostname)
+static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname, const char *client_ip_port, t_l7proto l7proto)
 {
 	hostfail_pool *fail_counter;
 	
-	fail_counter = HostFailPoolFind(params.hostlist_auto_fail_counters, hostname);
+	fail_counter = HostFailPoolFind(dp->hostlist_auto_fail_counters, hostname);
 	if (!fail_counter)
 	{
-		fail_counter = HostFailPoolAdd(&params.hostlist_auto_fail_counters, hostname, params.hostlist_auto_fail_time);
+		fail_counter = HostFailPoolAdd(&dp->hostlist_auto_fail_counters, hostname, dp->hostlist_auto_fail_time);
 		if (!fail_counter)
 		{
-			fprintf(stderr, "HostFailPoolAdd: out of memory\n");
+			DLOG_ERR("HostFailPoolAdd: out of memory\n");
 			return;
 		}
 	}
 	fail_counter->counter++;
-	DLOG("auto hostlist : %s : fail counter %d/%d\n", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
-	HOSTLIST_DEBUGLOG_APPEND("%s : fail counter %d/%d", hostname, fail_counter->counter, params.hostlist_auto_fail_threshold);
-	if (fail_counter->counter >= params.hostlist_auto_fail_threshold)
+	DLOG("auto hostlist (profile %d) : %s : fail counter %d/%d\n", dp->n, hostname, fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : fail counter %d/%d", hostname, dp->n, client_ip_port, l7proto_str(l7proto), fail_counter->counter, dp->hostlist_auto_fail_threshold);
+	if (fail_counter->counter >= dp->hostlist_auto_fail_threshold)
 	{
-		DLOG("auto hostlist : fail threshold reached. about to add %s to auto hostlist\n", hostname);
-		HostFailPoolDel(&params.hostlist_auto_fail_counters, fail_counter);
+		DLOG("auto hostlist (profile %d) : fail threshold reached. about to add %s to auto hostlist\n", dp->n, hostname);
+		HostFailPoolDel(&dp->hostlist_auto_fail_counters, fail_counter);
 		
-		DLOG("auto hostlist : rechecking %s to avoid duplicates\n", hostname);
+		DLOG("auto hostlist (profile %d) : rechecking %s to avoid duplicates\n", dp->n, hostname);
 		bool bExcluded=false;
-		if (!HostlistCheck(hostname, &bExcluded) && !bExcluded)
+		if (!HostlistCheck(dp, hostname, &bExcluded) && !bExcluded)
 		{
-			DLOG("auto hostlist : adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : adding", hostname);
-			if (!StrPoolAddStr(&params.hostlist, hostname))
+			DLOG("auto hostlist (profile %d) : adding %s to %s\n", dp->n, hostname, dp->hostlist_auto_filename);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : adding to %s", hostname, dp->n, client_ip_port, l7proto_str(l7proto), dp->hostlist_auto_filename);
+			if (!StrPoolAddStr(&dp->hostlist, hostname))
 			{
-				fprintf(stderr, "StrPoolAddStr out of memory\n");
+				DLOG_ERR("StrPoolAddStr out of memory\n");
 				return;
 			}
-			if (!append_to_list_file(params.hostlist_auto_filename, hostname))
+			if (!append_to_list_file(dp->hostlist_auto_filename, hostname))
 			{
 				DLOG_PERROR("write to auto hostlist:");
 				return;
 			}
-			params.hostlist_auto_mod_time = file_mod_time(params.hostlist_auto_filename);
+			dp->hostlist_auto_mod_time = file_mod_time(dp->hostlist_auto_filename);
 		}
 		else
 		{
-			DLOG("auto hostlist : NOT adding %s\n", hostname);
-			HOSTLIST_DEBUGLOG_APPEND("%s : NOT adding, duplicate detected", hostname);
+			DLOG("auto hostlist (profile %d) : NOT adding %s\n", dp->n, hostname);
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : NOT adding, duplicate detected", hostname, dp->n, client_ip_port, l7proto_str(l7proto));
 		}
 	}
 }
 
-static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto)
+static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto, const struct sockaddr *client)
 {
-	if (ctrack && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, params.hostlist_auto_retrans_threshold))
+	char client_ip_port[48];
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client,client_ip_port,sizeof(client_ip_port));
+	else
+		*client_ip_port=0;
+	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold, client_ip_port, ctrack->l7proto))
 	{
-		HOSTLIST_DEBUGLOG_APPEND("%s : tcp retrans threshold reached", ctrack->hostname);
-		auto_hostlist_failed(ctrack->hostname);
+		HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : retrans threshold reached", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
+		auto_hostlist_failed(ctrack->dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 	}
 }
 
@@ -403,47 +525,50 @@ static uint8_t ct_new_postnat_fix_udp(const t_ctrack *ctrack, struct ip *ip, str
 }
 
 
-static bool check_desync_interval(const t_ctrack *ctrack)
+static bool check_desync_interval(const struct desync_profile *dp, const t_ctrack *ctrack)
 {
-	if (params.desync_start)
+	if (dp)
 	{
-		if (ctrack)
+		if (dp->desync_start)
 		{
-			if (!cutoff_test(ctrack, params.desync_start, params.desync_start_mode))
+			if (ctrack)
 			{
-				DLOG("desync-start not reached (mode %c): %llu/%u . not desyncing\n", params.desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_start_mode), params.desync_start);
+				if (!cutoff_test(ctrack, dp->desync_start, dp->desync_start_mode))
+				{
+					DLOG("desync-start not reached (mode %c): %llu/%u . not desyncing\n", dp->desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->desync_start_mode), dp->desync_start);
+					return false;
+				}
+				DLOG("desync-start reached (mode %c): %llu/%u\n", dp->desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->desync_start_mode), dp->desync_start);
+			}
+			else
+			{
+				DLOG("not desyncing. desync-start is set but conntrack entry is missing\n");
 				return false;
 			}
-			DLOG("desync-start reached (mode %c): %llu/%u\n", params.desync_start_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_start_mode), params.desync_start);
 		}
-		else
+		if (dp->desync_cutoff)
 		{
-			DLOG("not desyncing. desync-start is set but conntrack entry is missing\n");
-			return false;
-		}
-	}
-	if (params.desync_cutoff)
-	{
-		if (ctrack)
-		{
-			if (ctrack->b_desync_cutoff)
+			if (ctrack)
 			{
-				DLOG("desync-cutoff reached (mode %c): %llu/%u . not desyncing\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
+				if (ctrack->b_desync_cutoff)
+				{
+					DLOG("desync-cutoff reached (mode %c): %llu/%u . not desyncing\n", dp->desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->desync_cutoff_mode), dp->desync_cutoff);
+					return false;
+				}
+				DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", dp->desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->desync_cutoff_mode), dp->desync_cutoff);
+			}
+			else
+			{
+				DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
 				return false;
 			}
-			DLOG("desync-cutoff not reached (mode %c): %llu/%u\n", params.desync_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.desync_cutoff_mode), params.desync_cutoff);
-		}
-		else
-		{
-			DLOG("not desyncing. desync-cutoff is set but conntrack entry is missing\n");
-			return false;
 		}
 	}
 	return true;
 }
-static bool process_desync_interval(t_ctrack *ctrack)
+static bool process_desync_interval(const struct desync_profile *dp, t_ctrack *ctrack)
 {
-	if (check_desync_interval(ctrack))
+	if (check_desync_interval(dp, ctrack))
 		return true;
 	else
 	{
@@ -474,12 +599,32 @@ static size_t pos_normalize(size_t split_pos, size_t reasm_offset, size_t len_pa
 	return split_pos;
 }
 
+static void autottl_discover(t_ctrack *ctrack, bool bIpv6)
+{
+	if (ctrack && ctrack->incoming_ttl)
+	{
+		autottl *attl = bIpv6 ? &ctrack->dp->desync_autottl6 : &ctrack->dp->desync_autottl;
+		if (AUTOTTL_ENABLED(*attl))
+		{
+			ctrack->autottl = autottl_guess(ctrack->incoming_ttl, attl);
+			if (ctrack->autottl)
+				DLOG("autottl: guessed %u\n",ctrack->autottl);
+			else
+				DLOG("autottl: could not guess\n");
+		}
+		else
+			ctrack->autottl = 0;
+	}
+}
+
 static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint32_t fwmark, const char *ifout, uint8_t *data_pkt, size_t *len_pkt, struct ip *ip, struct ip6_hdr *ip6hdr, struct tcphdr *tcphdr, size_t transport_len, uint8_t *data_payload, size_t len_payload)
 {
 	uint8_t verdict=VERDICT_PASS;
 
 	// additional safety check
 	if (!!ip == !!ip6hdr) return verdict;
+
+	struct desync_profile *dp = NULL;
 
 	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
@@ -492,7 +637,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
-
+	extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
+	
 	if (replay)
 	{
 		// in replay mode conntrack_replay is not NULL and ctrack is NULL
@@ -500,6 +646,20 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		//ConntrackPoolDump(&params.conntrack);
 		if (!ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, tcphdr, NULL, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
+
+		dp = ctrack_replay->dp;
+		if (dp)
+			DLOG("using cached desync profile %d\n",dp->n);
+		else if (!ctrack_replay->dp_search_complete)
+		{
+			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
+			ctrack_replay->dp_search_complete = true;
+		}
+		if (!dp)
+		{
+			DLOG("matching desync profile not found\n");
+			return verdict;
+		}
 	}
 	else
 	{
@@ -508,32 +668,47 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, tcphdr, NULL, len_payload, &ctrack, &bReverse))
 		{
+			dp = ctrack->dp;
 			ctrack_replay = ctrack;
-			maybe_cutoff(ctrack, IPPROTO_TCP);
 		}
-		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+		if (dp)
+			DLOG("using cached desync profile %d\n",dp->n);
+		else if (!ctrack || !ctrack->dp_search_complete)
+		{
+			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack ? ctrack->hostname : NULL, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			if (ctrack)
+			{
+				ctrack->dp = dp;
+				ctrack->dp_search_complete = true;
+			}
+		}
+		if (!dp)
+		{
+			DLOG("matching desync profile not found\n");
+			return verdict;
+		}
+		maybe_cutoff(ctrack, IPPROTO_TCP);
+
+		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
 
 		//ConntrackPoolDump(&params.conntrack);
 
-		if (params.wsize && tcp_synack_segment(tcphdr))
+		if (dp->wsize && tcp_synack_segment(tcphdr))
 		{
-			tcp_rewrite_winsize(tcphdr, params.wsize, params.wscale);
+			tcp_rewrite_winsize(tcphdr, dp->wsize, dp->wscale);
 			verdict=VERDICT_MODIFY;
 		}
-	
+
 		if (bReverse)
 		{
-			if (ctrack && !ctrack->autottl && ctrack->pcounter_reply==1)
+			if (ctrack)
 			{
-				autottl *attl = ip ? &params.desync_autottl : &params.desync_autottl6;
-				if (AUTOTTL_ENABLED(*attl))
+				if (!ctrack->incoming_ttl)
 				{
-					ctrack->autottl = autottl_guess(ttl_orig, attl);
-					if (ctrack->autottl)
-						DLOG("autottl: guessed %u\n",ctrack->autottl);
-					else
-						DLOG("autottl: could not guess\n");
+					DLOG("incoming TTL %u\n",ttl_orig);
+					ctrack->incoming_ttl = ttl_orig;
 				}
+				if (!ctrack->autottl) autottl_discover(ctrack,!!ip6hdr);
 			}
 
 			// process reply packets for auto hostlist mode
@@ -542,10 +717,17 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (ctrack && ctrack->hostname && ctrack->hostname_ah_check && (ctrack->ack_last-ctrack->ack0)==1)
 			{
 				bool bFail=false;
+
+				char client_ip_port[48];
+				if (*params.hostlist_auto_debuglog)
+					ntop46_port((struct sockaddr*)&dst,client_ip_port,sizeof(client_ip_port));
+				else
+					*client_ip_port=0;
+
 				if (tcphdr->th_flags & TH_RST)
 				{
 					DLOG("incoming RST detected for hostname %s\n", ctrack->hostname);
-					HOSTLIST_DEBUGLOG_APPEND("%s : incoming RST", ctrack->hostname);
+					HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : incoming RST", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 					bFail = true;
 				}
 				else if (len_payload && ctrack->l7proto==HTTP)
@@ -557,7 +739,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						if (bFail)
 						{
 							DLOG("redirect to another domain detected. possibly DPI redirect.\n");
-							HOSTLIST_DEBUGLOG_APPEND("%s : redirect to another domain", ctrack->hostname);
+							HOSTLIST_DEBUGLOG_APPEND("%s : profile %d : client %s : proto %s : redirect to another domain", ctrack->hostname, ctrack->dp->n, client_ip_port, l7proto_str(ctrack->l7proto));
 						}
 						else
 							DLOG("local or in-domain redirect detected. it's not a DPI redirect.\n");
@@ -569,10 +751,10 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 				}
 				if (bFail)
-					auto_hostlist_failed(ctrack->hostname);
+					auto_hostlist_failed(dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 				else
 					if (len_payload)
-						auto_hostlist_reset_fail_counter(ctrack->hostname);
+						auto_hostlist_reset_fail_counter(dp, ctrack->hostname, client_ip_port, ctrack->l7proto);
 				if (tcphdr->th_flags & TH_RST)
 					ConntrackClearHostname(ctrack); // do not react to further dup RSTs
 			}
@@ -580,19 +762,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			return verdict; // nothing to do. do not waste cpu
 		}
 
-
-		if (params.wssize)
+		if (dp->wssize)
 		{
 			if (ctrack)
 			{
 				if (ctrack->b_wssize_cutoff)
 				{
-					DLOG("not changing wssize. wssize-cutoff reached\n");
+					DLOG("wssize-cutoff reached (mode %c): %llu/%u . not changing wssize.\n", dp->wssize_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->wssize_cutoff_mode), dp->wssize_cutoff);
 				}
 				else
 				{
-					if (params.wssize_cutoff) DLOG("wssize-cutoff not reached (mode %c): %llu/%u\n", params.wssize_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,params.wssize_cutoff_mode), params.wssize_cutoff);
-					tcp_rewrite_winsize(tcphdr, params.wssize, params.wsscale);
+					if (dp->wssize_cutoff) DLOG("wssize-cutoff not reached (mode %c): %llu/%u\n", dp->wssize_cutoff_mode, (unsigned long long)cutoff_get_limit(ctrack,dp->wssize_cutoff_mode), dp->wssize_cutoff);
+					tcp_rewrite_winsize(tcphdr, dp->wssize, dp->wsscale);
 					verdict=VERDICT_MODIFY;
 				}
 			}
@@ -603,29 +784,31 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		}
 	} // !replay
 
-	ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (params.desync_ttl6 ? params.desync_ttl6 : ttl_orig) : (params.desync_ttl ? params.desync_ttl : ttl_orig));
+	ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
 	flags_orig = *((uint8_t*)tcphdr+13);
 	scale_factor = tcp_find_scale_factor(tcphdr);
 	timestamps = tcp_find_timestamps(tcphdr);
 
-	extract_endpoints(ip, ip6hdr, tcphdr, NULL, &src, &dst);
-
 	if (!replay)
 	{
+		// start and cutoff limiters
+		if (!process_desync_interval(dp, ctrack)) return verdict;
+
 		if (tcp_syn_segment(tcphdr))
 		{
-			switch (params.desync_mode0)
+			switch (dp->desync_mode0)
 			{
 				case DESYNC_SYNACK:
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_SYN|TH_ACK, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-						ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+						ttl_fake,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+						dp->desync_fooling_mode,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 						NULL, 0, pkt1, &pkt1_len))
 					{
 						return verdict;
 					}
 					DLOG("sending fake SYNACK\n");
-					if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
 					break;
 				case DESYNC_SYNDATA:
@@ -642,13 +825,14 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-						ttl_orig,0,0,0, params.fake_syndata,params.fake_syndata_size, pkt1,&pkt1_len))
+						ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+						0,0,0, dp->fake_syndata,dp->fake_syndata_size, pkt1,&pkt1_len))
 					{
 						return verdict;
 					}
 					DLOG("sending SYN with fake data : ");
-					hexdump_limited_dlog(params.fake_syndata,params.fake_syndata_size,PKTDATA_MAXDUMP); DLOG("\n");
-					if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+					hexdump_limited_dlog(dp->fake_syndata,dp->fake_syndata_size,PKTDATA_MAXDUMP); DLOG("\n");
+					if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
 					verdict = ct_new_postnat_fix_tcp(ctrack, ip, ip6hdr, tcphdr);
 					break;
@@ -659,11 +843,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			return verdict;
 		}
 
-		// start and cutoff limiters
-		if (!process_desync_interval(ctrack)) return verdict;
 	} // !replay
-	
-	if (!params.wssize && params.desync_mode==DESYNC_NONE && !params.hostcase && !params.hostnospace && !params.domcase && !*params.hostlist_auto_filename) return verdict; // nothing to do. do not waste cpu
 	
 	if (!(tcphdr->th_flags & TH_SYN) && len_payload)
 	{
@@ -671,12 +851,11 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		size_t fake_size;
 		char host[256];
 		bool bHaveHost=false;
-		bool bIsHttp;
-		bool bKnownProtocol = false;
 		uint8_t *p, *phost;
 		const uint8_t *rdata_payload = data_payload;
 		size_t rlen_payload = len_payload;
 		size_t split_pos;
+		t_l7proto l7proto = UNKNOWN;
 
 		if (replay)
 		{
@@ -689,27 +868,23 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			rlen_payload = ctrack->reasm_orig.size_present;
 		}
 
-		process_retrans_fail(ctrack, IPPROTO_TCP);
+		process_retrans_fail(ctrack, IPPROTO_TCP, (struct sockaddr*)&src);
 
-		if ((bIsHttp = IsHttp(rdata_payload,rlen_payload)))
+		if (IsHttp(rdata_payload,rlen_payload))
 		{
 			DLOG("packet contains HTTP request\n");
-			if (ctrack && !ctrack->l7proto) ctrack->l7proto = HTTP;
+			l7proto = HTTP;
+			if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
 
 			// we do not reassemble http
 			reasm_orig_cancel(ctrack);
-			
 			forced_wssize_cutoff(ctrack);
-			fake = params.fake_http;
-			fake_size = params.fake_http_size;
-			if (params.hostlist || params.hostlist_exclude)
+
+			bHaveHost=HttpExtractHost(rdata_payload,rlen_payload,host,sizeof(host));
+			if (!bHaveHost)
 			{
-				bHaveHost=HttpExtractHost(rdata_payload,rlen_payload,host,sizeof(host));
-				if (!bHaveHost)
-				{
-					DLOG("not applying tampering to HTTP without Host:\n");
-					return verdict;
-				}
+				DLOG("not applying tampering to HTTP without Host:\n");
+				return verdict;
 			}
 			if (ctrack)
 			{
@@ -722,19 +897,18 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					DLOG("req retrans : tcp seq interval %u-%u\n",ctrack->req_seq_start,ctrack->req_seq_end);
 				}
 			}
-			split_pos = HttpPos(params.desync_split_http_req, params.desync_split_pos, rdata_payload, rlen_payload);
-			bKnownProtocol = true;
 		}
 		else if (IsTLSClientHello(rdata_payload,rlen_payload,TLS_PARTIALS_ENABLE))
 		{
 			bool bReqFull = IsTLSRecordFull(rdata_payload,rlen_payload);
 			DLOG(bReqFull ? "packet contains full TLS ClientHello\n" : "packet contains partial TLS ClientHello\n");
+			l7proto = TLS;
 
 			bHaveHost=TLSHelloExtractHost(rdata_payload,rlen_payload,host,sizeof(host),TLS_PARTIALS_ENABLE);
 
 			if (ctrack)
 			{
-				if (!ctrack->l7proto) ctrack->l7proto = TLS;
+				if (!ctrack->l7proto) ctrack->l7proto = l7proto;
 				// do not reasm retransmissions
 				if (!bReqFull && ReasmIsEmpty(&ctrack->reasm_orig) && !ctrack->req_seq_abandoned &&
 					!(ctrack->req_seq_finalized && seq_within(ctrack->seq_last, ctrack->req_seq_start, ctrack->req_seq_end)))
@@ -745,7 +919,6 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						reasm_orig_cancel(ctrack);
 						return verdict;
 					}
-					
 				}
 				if (!ctrack->req_seq_finalized)
 				{
@@ -772,7 +945,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					}
 					else
 					{
-						fprintf(stderr, "rawpacket_queue failed !'\n");
+						DLOG_ERR("rawpacket_queue failed !\n");
 						reasm_orig_cancel(ctrack);
 						return verdict;
 					}
@@ -785,23 +958,13 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 				}
 			}
 
-			if (params.desync_skip_nosni && !bHaveHost)
+			if (dp->desync_skip_nosni && !bHaveHost)
 			{
 				DLOG("not applying tampering to TLS ClientHello without hostname in the SNI\n");
 				reasm_orig_cancel(ctrack);
 				return verdict;
 			}
-			
-			fake = params.fake_tls;
-			fake_size = params.fake_tls_size;
-			split_pos = TLSPos(params.desync_split_tls, params.desync_split_pos, rdata_payload, rlen_payload, 0);
-			bKnownProtocol = true;
 		}
-		else
-			split_pos=params.desync_split_pos;
-
-		reasm_orig_cancel(ctrack);
-		rdata_payload=NULL;
 
 		if (ctrack && ctrack->req_seq_finalized)
 		{
@@ -810,76 +973,169 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			if (dseq>=0x1000000 && !(dseq & 0x80000000)) ctrack->req_seq_abandoned=true;
 		}
 
-		if (bHaveHost)
+		if (bHaveHost) DLOG("hostname: %s\n",host);
+
+		bool bDiscoveredL7;
+		if (ctrack_replay)
 		{
-			DLOG("hostname: %s\n",host);
-			if (params.hostlist || params.hostlist_exclude)
+			bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto!=UNKNOWN;
+			ctrack_replay->l7proto_discovered=true;
+		}
+		else
+			bDiscoveredL7 = !ctrack_replay && l7proto!=UNKNOWN;
+		if (bDiscoveredL7) DLOG("discovered l7 protocol\n");
+
+		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname);
+		if (bDiscoveredHostname)
+		{
+			DLOG("discovered hostname\n");
+			if (ctrack_replay)
 			{
-				bool bBypass;
-				if (HostlistCheck(host, &bBypass))
-					ctrack_stop_retrans_counter(ctrack_replay);
-				else
+				ctrack_replay->hostname=strdup(host);
+				if (!ctrack_replay->hostname)
 				{
-					if (ctrack_replay)
-					{
-						ctrack_replay->hostname_ah_check = *params.hostlist_auto_filename && !bBypass;
-						if (ctrack_replay->hostname_ah_check)
-						{
-							if (!ctrack_replay->hostname) ctrack_replay->hostname=strdup(host);
-						}
-						else
-							ctrack_stop_retrans_counter(ctrack_replay);
-					}
-					DLOG("not applying tampering to this request\n");
+					DLOG_ERR("hostname dup : out of memory");
+					reasm_orig_cancel(ctrack);
 					return verdict;
 				}
 			}
 		}
-		
-		if (!bKnownProtocol)
+
+		bool bCheckDone=false, bCheckResult=false, bCheckExcluded=false;
+		if (bDiscoveredL7 || bDiscoveredHostname)
 		{
-			if (!params.desync_any_proto) return verdict;
-			DLOG("applying tampering to unknown protocol\n");
-			fake = params.fake_unknown;
-			fake_size = params.fake_unknown_size;
+			struct desync_profile *dp_prev = dp;
+
+			dp = dp_find(&params.desync_profiles, IPPROTO_TCP, (struct sockaddr *)&dst, ctrack_replay ? ctrack_replay->hostname : host, ctrack_replay ? ctrack_replay->l7proto : l7proto, &bCheckDone, &bCheckResult, &bCheckExcluded);
+			if (ctrack_replay)
+			{
+				ctrack_replay->dp = dp;
+				ctrack_replay->dp_search_complete = true;
+				ctrack_replay->bCheckDone = bCheckDone;
+				ctrack_replay->bCheckResult = bCheckResult;
+				ctrack_replay->bCheckExcluded = bCheckExcluded;
+			}
+			if (!dp)
+			{
+				reasm_orig_cancel(ctrack);
+				return verdict;
+			}
+			if (dp!=dp_prev)
+			{
+				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
+				// rediscover autottl
+				autottl_discover(ctrack_replay,!!ip6hdr);
+				// re-evaluate start/cutoff limiters
+				if (!replay)
+				{
+					maybe_cutoff(ctrack, IPPROTO_TCP);
+					if (!process_desync_interval(dp, ctrack))
+					{
+						reasm_orig_cancel(ctrack);
+						return verdict;
+					}
+				}
+			}
+		}
+		else if (ctrack_replay)
+		{
+			bCheckDone = ctrack_replay->bCheckDone;
+			bCheckResult = ctrack_replay->bCheckResult;
+			bCheckExcluded = ctrack_replay->bCheckExcluded;
 		}
 
-		if (bIsHttp && (params.hostcase || params.hostnospace || params.domcase) && (phost = (uint8_t*)memmem(data_payload, len_payload, "\r\nHost: ", 8)))
+		if (bHaveHost && (dp->hostlist || dp->hostlist_exclude))
 		{
-			if (params.hostcase)
+			if (!bCheckDone)
+				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded);
+			if (bCheckResult)
+				ctrack_stop_retrans_counter(ctrack_replay);
+			else
 			{
-				DLOG("modifying Host: => %c%c%c%c:\n", params.hostspell[0], params.hostspell[1], params.hostspell[2], params.hostspell[3]);
-				memcpy(phost + 2, params.hostspell, 4);
+				if (ctrack_replay)
+				{
+					ctrack_replay->hostname_ah_check = *dp->hostlist_auto_filename && !bCheckExcluded;
+					if (!ctrack_replay->hostname_ah_check)
+						ctrack_stop_retrans_counter(ctrack_replay);
+				}
+				DLOG("not applying tampering to this request\n");
+				reasm_orig_cancel(ctrack);
+				return verdict;
+			}
+		}
+
+		// desync profile may have changed after hostname was revealed
+		switch(l7proto)
+		{
+			case HTTP:
+				fake = dp->fake_http;
+				fake_size = dp->fake_http_size;
+				split_pos = HttpPos(dp->desync_split_http_req, dp->desync_split_pos, rdata_payload, rlen_payload);
+				break;
+			case TLS:
+				fake = dp->fake_tls;
+				fake_size = dp->fake_tls_size;
+				split_pos = TLSPos(dp->desync_split_tls, dp->desync_split_pos, rdata_payload, rlen_payload, 0);
+				break;
+			default:
+				fake = dp->fake_unknown;
+				fake_size = dp->fake_unknown_size;
+				split_pos=dp->desync_split_pos;
+				break;
+		}
+
+		// we do not need reasm buffer anymore
+		reasm_orig_cancel(ctrack);
+		rdata_payload=NULL;
+
+		if (l7proto==UNKNOWN)
+		{
+			if (!dp->desync_any_proto)
+			{
+				DLOG("not applying tampering to unknown protocol\n");
+				return verdict;
+			}
+			DLOG("applying tampering to unknown protocol\n");
+		}
+
+		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
+
+		if ((l7proto == HTTP) && (dp->hostcase || dp->hostnospace || dp->domcase) && HttpFindHost(&phost,data_payload,len_payload))
+		{
+			if (dp->hostcase)
+			{
+				DLOG("modifying Host: => %c%c%c%c:\n", dp->hostspell[0], dp->hostspell[1], dp->hostspell[2], dp->hostspell[3]);
+				memcpy(phost, dp->hostspell, 4);
 				verdict=VERDICT_MODIFY;
 			}
-			if (params.domcase)
+			if (dp->domcase)
 			{
 				DLOG("mixing domain case\n");
-				for (p = phost+7; p < (data_payload + len_payload) && *p != '\r' && *p != '\n'; p++)
+				for (p = phost+5; p < (data_payload + len_payload) && *p != '\r' && *p != '\n'; p++)
 					*p = (((size_t)p) & 1) ? tolower(*p) : toupper(*p);
 				verdict=VERDICT_MODIFY;
 			}
 			uint8_t *pua;
-			if (params.hostnospace &&
+			if (dp->hostnospace &&
 				(pua = (uint8_t*)memmem(data_payload, len_payload, "\r\nUser-Agent: ", 14)) &&
 				(pua = (uint8_t*)memmem(pua + 1, len_payload - (pua - data_payload) - 1, "\r\n", 2)))
 			{
 				DLOG("removing space after Host: and adding it to User-Agent:\n");
 				if (pua > phost)
 				{
-					memmove(phost + 7, phost + 8, pua - phost - 8);
-					phost[pua - phost - 1] = ' ';
+					memmove(phost + 5, phost + 6, pua - phost - 6);
+					pua[-1]=' ';
 				}
 				else
 				{
-					memmove(pua + 1, pua, phost - pua + 7);
+					memmove(pua + 1, pua, phost - pua + 5);
 					*pua = ' ';
 				}
 				verdict=VERDICT_MODIFY;
 			}
 		}
 
-		if (params.desync_mode==DESYNC_NONE) return verdict;
+		if (dp->desync_mode==DESYNC_NONE) return verdict;
 
 		if (params.debug)
 		{
@@ -892,10 +1148,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 		if (!split_pos || split_pos>rlen_payload) split_pos=1;
 		split_pos=pos_normalize(split_pos,reasm_offset,len_payload);
 
-		enum dpi_desync_mode desync_mode = params.desync_mode;
+		enum dpi_desync_mode desync_mode = dp->desync_mode;
 		uint32_t fooling_orig = FOOL_NONE;
 		bool b;
-
 		pkt1_len = sizeof(pkt1);
 		b = false;
 		switch(desync_mode)
@@ -903,19 +1158,20 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_FAKE_KNOWN:
 				if (reasm_offset)
 				{
-					desync_mode = params.desync_mode2;
+					desync_mode = dp->desync_mode2;
 					break;
 				}
-				if (!bKnownProtocol)
+				if (l7proto==UNKNOWN)
 				{
 					DLOG("not applying fake because of unknown protocol\n");
-					desync_mode = params.desync_mode2;
+					desync_mode = dp->desync_mode2;
 					break;
 				}
 			case DESYNC_FAKE:
 				if (reasm_offset) break;
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					ttl_fake,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+					dp->desync_fooling_mode,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 					fake, fake_size, pkt1, &pkt1_len))
 				{
 					return verdict;
@@ -928,7 +1184,8 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_RSTACK:
 				if (reasm_offset) break;
 				if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, TH_RST | (desync_mode==DESYNC_RSTACK ? TH_ACK:0), tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-					ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					ttl_fake,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+					dp->desync_fooling_mode,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 					NULL, 0, pkt1, &pkt1_len))
 				{
 					return verdict;
@@ -940,12 +1197,13 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_DESTOPT:
 			case DESYNC_IPFRAG1:
 				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
-				desync_mode = params.desync_mode2;
+				desync_mode = dp->desync_mode2;
 				if (ip6hdr && (desync_mode==DESYNC_NONE || !desync_valid_second_stage_tcp(desync_mode) ||
 					(!split_pos && (desync_mode==DESYNC_SPLIT || desync_mode==DESYNC_SPLIT2 || desync_mode==DESYNC_DISORDER || desync_mode==DESYNC_DISORDER2))))
 				{
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-						ttl_orig,fooling_orig,0,0,
+						ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+						fooling_orig,0,0,
 						data_payload, len_payload, pkt1, &pkt1_len))
 					{
 						return verdict;
@@ -963,9 +1221,9 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 		if (b)
 		{
-			if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+			if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 				return verdict;
-			if (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_tcp(params.desync_mode2))
+			if (dp->desync_mode2==DESYNC_NONE || !desync_valid_second_stage_tcp(dp->desync_mode2))
 			{
 				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", *len_pkt, len_payload);
 				verdict_tcp_csum_fix(verdict, tcphdr, transport_len, ip, ip6hdr);
@@ -973,7 +1231,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					return verdict;
 				return VERDICT_DROP;
 			}
-			desync_mode = params.desync_mode2;
+			desync_mode = dp->desync_mode2;
 		}
 
 		pkt1_len = sizeof(pkt1);
@@ -986,7 +1244,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					uint8_t fakeseg[DPI_DESYNC_MAX_FAKE_LEN+100], *seg;
 					size_t seg_len;
 
-					if (params.desync_seqovl>=split_pos)
+					if (dp->desync_seqovl>=split_pos)
 					{
 						DLOG("seqovl>=split_pos. desync is not possible.\n");
 						return verdict;
@@ -994,16 +1252,16 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 
 					if (split_pos<len_payload)
 					{
-						if (params.desync_seqovl)
+						if (dp->desync_seqovl)
 						{
-							seg_len = len_payload-split_pos+params.desync_seqovl;
+							seg_len = len_payload-split_pos+dp->desync_seqovl;
 							if (seg_len>sizeof(fakeseg))
 							{
 								DLOG("seqovl is too large\n");
 								return verdict;
 							}
-							fill_pattern(fakeseg,params.desync_seqovl,params.seqovl_pattern,sizeof(params.seqovl_pattern));
-							memcpy(fakeseg+params.desync_seqovl,data_payload+split_pos,len_payload-split_pos);
+							fill_pattern(fakeseg,dp->desync_seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
+							memcpy(fakeseg+dp->desync_seqovl,data_payload+split_pos,len_payload-split_pos);
 							seg = fakeseg;
 						}
 						else
@@ -1012,11 +1270,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 							seg_len = len_payload-split_pos;
 						}
 
-						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(net32_add(tcphdr->th_seq,split_pos),-params.desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(net32_add(tcphdr->th_seq,split_pos),-dp->desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+								ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+								fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 								seg, seg_len, pkt1, &pkt1_len))
 							return verdict;
-						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu seqovl=%u : ",split_pos,len_payload-1, len_payload-split_pos, params.desync_seqovl);
+						DLOG("sending 2nd out-of-order tcp segment %zu-%zu len=%zu seqovl=%u : ",split_pos,len_payload-1, len_payload-split_pos, dp->desync_seqovl);
 						hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
 						if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 							return verdict;
@@ -1027,18 +1286,20 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						seg_len = sizeof(fakeseg);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_fake,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+								dp->desync_fooling_mode,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 								zeropkt, split_pos, fakeseg, &seg_len))
 							return verdict;
 						DLOG("sending fake(1) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
+						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
 							return verdict;
 					}
 
 					pkt1_len = sizeof(pkt1);
 					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+							ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+							fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							data_payload, split_pos, pkt1, &pkt1_len))
 						return verdict;
 					DLOG("sending 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
@@ -1050,7 +1311,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						DLOG("sending fake(2) 1st out-of-order tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
+						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, seg_len))
 							return verdict;
 					}
 
@@ -1068,25 +1329,26 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						fakeseg_len = sizeof(fakeseg);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, tcphdr->th_seq, tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_fake,params.desync_fooling_mode,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_fake,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+								dp->desync_fooling_mode,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 								zeropkt, split_pos, fakeseg, &fakeseg_len))
 							return verdict;
 						DLOG("sending fake(1) 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
+						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
 							return verdict;
 					}
 
-					if (params.desync_seqovl)
+					if (dp->desync_seqovl)
 					{
-						seg_len = split_pos+params.desync_seqovl;
+						seg_len = split_pos+dp->desync_seqovl;
 						if (seg_len>sizeof(ovlseg))
 						{
 							DLOG("seqovl is too large");
 							return verdict;
 						}
-						fill_pattern(ovlseg,params.desync_seqovl,params.seqovl_pattern,sizeof(params.seqovl_pattern));
-						memcpy(ovlseg+params.desync_seqovl,data_payload,split_pos);
+						fill_pattern(ovlseg,dp->desync_seqovl,dp->seqovl_pattern,sizeof(dp->seqovl_pattern));
+						memcpy(ovlseg+dp->desync_seqovl,data_payload,split_pos);
 						seg = ovlseg;
 					}
 					else
@@ -1095,11 +1357,12 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 						seg_len = split_pos;
 					}
 
-					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,-params.desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-							ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+					if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,-dp->desync_seqovl), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
+							ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+							fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 							seg, seg_len, pkt1, &pkt1_len))
 						return verdict;
-					DLOG("sending 1st tcp segment 0-%zu len=%zu seqovl=%u : ",split_pos-1, split_pos, params.desync_seqovl);
+					DLOG("sending 1st tcp segment 0-%zu len=%zu seqovl=%u : ",split_pos-1, split_pos, dp->desync_seqovl);
 					hexdump_limited_dlog(seg,seg_len,PKTDATA_MAXDUMP); DLOG("\n");
 					if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 						return verdict;
@@ -1108,14 +1371,15 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					{
 						DLOG("sending fake(2) 1st tcp segment 0-%zu len=%zu : ",split_pos-1, split_pos);
 						hexdump_limited_dlog(zeropkt,split_pos,PKTDATA_MAXDUMP); DLOG("\n");
-						if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
+						if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , fakeseg, fakeseg_len))
 							return verdict;
 					}
 					if (split_pos<len_payload)
 					{
 						pkt1_len = sizeof(pkt1);
 						if (!prepare_tcp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, flags_orig, net32_add(tcphdr->th_seq,split_pos), tcphdr->th_ack, tcphdr->th_win, scale_factor, timestamps,
-								ttl_orig,fooling_orig,params.desync_badseq_increment,params.desync_badseq_ack_increment,
+								ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+								fooling_orig,dp->desync_badseq_increment,dp->desync_badseq_ack_increment,
 								data_payload+split_pos, len_payload-split_pos, pkt1, &pkt1_len))
 							return verdict;
 						DLOG("sending 2nd tcp segment %zu-%zu len=%zu : ",split_pos,len_payload-1, len_payload-split_pos);
@@ -1135,7 +1399,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 					uint8_t pkt3[DPI_DESYNC_MAX_FAKE_LEN+100], *pkt_orig;
 					size_t pkt_orig_len;
 
-					size_t ipfrag_pos = (params.desync_ipfrag_pos_tcp && params.desync_ipfrag_pos_tcp<transport_len) ? params.desync_ipfrag_pos_tcp : 24;
+					size_t ipfrag_pos = (dp->desync_ipfrag_pos_tcp && dp->desync_ipfrag_pos_tcp<transport_len) ? dp->desync_ipfrag_pos_tcp : 24;
 					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
 					pkt1_len = sizeof(pkt1);
@@ -1182,7 +1446,7 @@ static uint8_t dpi_desync_tcp_packet_play(bool replay, size_t reasm_offset, uint
 static bool quic_reasm_cancel(t_ctrack *ctrack, const char *reason)
 {
 	reasm_orig_cancel(ctrack);
-	if (params.desync_any_proto)
+	if (ctrack && ctrack->dp && ctrack->dp->desync_any_proto)
 	{
 		DLOG("%s. applying tampering because desync_any_proto is set\n",reason);
 		return true;
@@ -1204,6 +1468,8 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	// no need to desync middle packets in reasm session
 	if (reasm_offset) return verdict;
 
+	struct desync_profile *dp = NULL;
+
 	t_ctrack *ctrack=NULL, *ctrack_replay=NULL;
 	bool bReverse=false;
 
@@ -1211,7 +1477,11 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 	uint8_t pkt1[DPI_DESYNC_MAX_FAKE_LEN+100], pkt2[DPI_DESYNC_MAX_FAKE_LEN+100];
 	size_t pkt1_len, pkt2_len;
 	uint8_t ttl_orig,ttl_fake;
-	
+	t_l7proto l7proto = UNKNOWN;
+
+	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
+	extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
+
 	if (replay)
 	{
 		// in replay mode conntrack_replay is not NULL and ctrack is NULL
@@ -1219,6 +1489,20 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		//ConntrackPoolDump(&params.conntrack);
 		if (!ConntrackPoolDoubleSearch(&params.conntrack, ip, ip6hdr, NULL, udphdr, &ctrack_replay, &bReverse) || bReverse)
 			return verdict;
+
+		dp = ctrack_replay->dp;
+		if (dp)
+			DLOG("using cached desync profile %d\n",dp->n);
+		else if (!ctrack_replay->dp_search_complete)
+		{
+			dp = ctrack_replay->dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay->hostname, ctrack_replay->l7proto, NULL, NULL, NULL);
+			ctrack_replay->dp_search_complete = true;
+		}
+		if (!dp)
+		{
+			DLOG("matching desync profile not found\n");
+			return verdict;
+		}
 	}
 	else
 	{
@@ -1227,26 +1511,47 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		ConntrackPoolPurge(&params.conntrack);
 		if (ConntrackPoolFeed(&params.conntrack, ip, ip6hdr, NULL, udphdr, len_payload, &ctrack, &bReverse))
 		{
+			dp = ctrack->dp;
 			ctrack_replay = ctrack;
-			maybe_cutoff(ctrack, IPPROTO_UDP);
 		}
-		HostFailPoolPurgeRateLimited(&params.hostlist_auto_fail_counters);
+		if (dp)
+			DLOG("using cached desync profile %d\n",dp->n);
+		else if (!ctrack || !ctrack->dp_search_complete)
+		{
+			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack ? ctrack->hostname : NULL, ctrack ? ctrack->l7proto : UNKNOWN, NULL, NULL, NULL);
+			if (ctrack)
+			{
+				ctrack->dp = dp;
+				ctrack->dp_search_complete = true;
+			}
+		}
+		if (!dp)
+		{
+			DLOG("matching desync profile not found\n");
+			return verdict;
+		}
+		maybe_cutoff(ctrack, IPPROTO_UDP);
+
+		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
 		//ConntrackPoolDump(&params.conntrack);
 	}
 
-	if (bReverse) return verdict; // nothing to do. do not waste cpu
-
-	if (params.desync_mode==DESYNC_NONE && !*params.hostlist_auto_filename) return verdict; // do not waste cpu
+	if (bReverse && ctrack)
+	{
+		if (!ctrack->incoming_ttl)
+		{
+			DLOG("incoming TTL %u\n",ttl_orig);
+			ctrack->incoming_ttl = ttl_orig;
+		}
+		if (!ctrack->autottl) autottl_discover(ctrack,!!ip6hdr);
+		return verdict; // nothing to do. do not waste cpu
+	}
 
 	// start and cutoff limiters
-	if (!replay && !process_desync_interval(ctrack)) return verdict;
+	if (!replay && !process_desync_interval(dp, ctrack)) return verdict;
 
 	uint32_t desync_fwmark = fwmark | params.desync_fwmark;
-	ttl_orig = ip ? ip->ip_ttl : ip6hdr->ip6_ctlun.ip6_un1.ip6_un1_hlim;
-	if (ip6hdr) ttl_fake = params.desync_ttl6 ? params.desync_ttl6 : ttl_orig;
-	else ttl_fake = params.desync_ttl ? params.desync_ttl : ttl_orig;
-	extract_endpoints(ip, ip6hdr, NULL, udphdr, &src, &dst);
-	
+
 	if (len_payload)
 	{
 		const uint8_t *fake;
@@ -1254,12 +1559,12 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		bool b;
 		char host[256];
 		bool bHaveHost=false;
-		bool bKnownProtocol=false;
 
 		if (IsQUICInitial(data_payload,len_payload))
 		{
 			DLOG("packet contains QUIC initial\n");
-			if (ctrack && !ctrack->l7proto) ctrack->l7proto = QUIC;
+			l7proto = QUIC;
+			if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
 
 			uint8_t clean[16384], *pclean;
 			size_t clean_len;
@@ -1321,7 +1626,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 							}
 							else
 							{
-								fprintf(stderr, "rawpacket_queue failed !'\n");
+								DLOG_ERR("rawpacket_queue failed !\n");
 								reasm_orig_cancel(ctrack);
 								return verdict;
 							}
@@ -1337,7 +1642,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					if (bIsHello)
 					{
 						bHaveHost = TLSHelloExtractHostFromHandshake(defrag + hello_offset, hello_len, host, sizeof(host), TLS_PARTIALS_ENABLE);
-						if (!bHaveHost && params.desync_skip_nosni)
+						if (!bHaveHost && dp->desync_skip_nosni)
 						{
 							reasm_orig_cancel(ctrack);
 							DLOG("not applying tampering to QUIC ClientHello without hostname in the SNI\n");
@@ -1360,10 +1665,6 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 				// decrypt failed
 				if (!quic_reasm_cancel(ctrack,"QUIC initial decryption failed")) return verdict;
 			}
-			
-			fake = params.fake_quic;
-			fake_size = params.fake_quic_size;
-			bKnownProtocol = true;
 		}
 		else // not QUIC initial
 		{
@@ -1375,55 +1676,139 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			if (IsWireguardHandshakeInitiation(data_payload,len_payload))
 			{
 				DLOG("packet contains wireguard handshake initiation\n");
-				if (ctrack && !ctrack->l7proto) ctrack->l7proto = WIREGUARD;
-				fake = params.fake_wg;
-				fake_size = params.fake_wg_size;
-				bKnownProtocol = true;
+				l7proto = WIREGUARD;
+				if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
 			}
 			else if (IsDhtD1(data_payload,len_payload))
 			{
 				DLOG("packet contains DHT d1...e\n");
-				if (ctrack && !ctrack->l7proto) ctrack->l7proto = DHT;
-				fake = params.fake_dht;
-				fake_size = params.fake_dht_size;
-				bKnownProtocol = true;
+				l7proto = DHT;
+				if (ctrack && ctrack->l7proto==UNKNOWN) ctrack->l7proto = l7proto;
 			}
 			else
 			{
-				if (!params.desync_any_proto) return verdict;
+				if (!dp->desync_any_proto)
+				{
+					DLOG("not applying tampering to unknown protocol\n");
+					return verdict;
+				}
 				DLOG("applying tampering to unknown protocol\n");
-				fake = params.fake_unknown_udp;
-				fake_size = params.fake_unknown_udp_size;
 			}
 		}
 
-		if (bHaveHost)
+		if (bHaveHost) DLOG("hostname: %s\n",host);
+
+		bool bDiscoveredL7;
+		if (ctrack_replay)
 		{
-			DLOG("hostname: %s\n",host);
-			if (params.hostlist || params.hostlist_exclude)
+			bDiscoveredL7 = !ctrack_replay->l7proto_discovered && ctrack_replay->l7proto!=UNKNOWN;
+			ctrack_replay->l7proto_discovered=true;
+		}
+		else
+			bDiscoveredL7 = !ctrack_replay && l7proto!=UNKNOWN;
+		if (bDiscoveredL7) DLOG("discovered l7 protocol\n");
+
+		bool bDiscoveredHostname = bHaveHost && !(ctrack_replay && ctrack_replay->hostname);
+		if (bDiscoveredHostname)
+		{
+			DLOG("discovered hostname\n");
+			if (ctrack_replay)
 			{
-				bool bBypass;
-				if (!HostlistCheck(host, &bBypass))
+				ctrack_replay->hostname=strdup(host);
+				if (!ctrack_replay->hostname)
 				{
-					if (ctrack_replay)
-					{
-						ctrack_replay->hostname_ah_check = *params.hostlist_auto_filename && !bBypass;
-						if (ctrack_replay->hostname_ah_check)
-						{
-							// first request is not retrans
-							if (ctrack_replay->hostname)
-								process_retrans_fail(ctrack_replay, IPPROTO_UDP);
-							else
-								ctrack_replay->hostname=strdup(host);
-						}
-					}
-					DLOG("not applying tampering to this request\n");
+					DLOG_ERR("hostname dup : out of memory");
 					return verdict;
 				}
 			}
 		}
 
-		enum dpi_desync_mode desync_mode = params.desync_mode;
+		bool bCheckDone=false, bCheckResult=false, bCheckExcluded=false;
+		if (bDiscoveredL7 || bDiscoveredHostname)
+		{
+			struct desync_profile *dp_prev = dp;
+
+			dp = dp_find(&params.desync_profiles, IPPROTO_UDP, (struct sockaddr *)&dst, ctrack_replay ? ctrack_replay->hostname : host, ctrack_replay ? ctrack_replay->l7proto : l7proto, &bCheckDone, &bCheckResult, &bCheckExcluded);
+			if (ctrack_replay)
+			{
+				ctrack_replay->dp = dp;
+				ctrack_replay->dp_search_complete = true;
+				ctrack_replay->bCheckDone = bCheckDone;
+				ctrack_replay->bCheckResult = bCheckResult;
+				ctrack_replay->bCheckExcluded = bCheckExcluded;
+			}
+			if (!dp)
+			{
+				reasm_orig_cancel(ctrack);
+				return verdict;
+			}
+			if (dp!=dp_prev)
+			{
+				DLOG("desync profile changed by revealed l7 protocol or hostname !\n");
+				// rediscover autottl
+				autottl_discover(ctrack_replay,!!ip6hdr);
+				// re-evaluate start/cutoff limiters
+				if (!replay)
+				{
+					maybe_cutoff(ctrack, IPPROTO_UDP);
+					if (!process_desync_interval(dp, ctrack)) return verdict;
+				}
+			}
+		}
+		else if (ctrack_replay)
+		{
+			bCheckDone = ctrack_replay->bCheckDone;
+			bCheckResult = ctrack_replay->bCheckResult;
+			bCheckExcluded = ctrack_replay->bCheckExcluded;
+		}
+
+		if (bHaveHost && (dp->hostlist || dp->hostlist_exclude))
+		{
+			if (!bCheckDone)
+				bCheckResult = HostlistCheck(dp, host, &bCheckExcluded);
+			if (bCheckResult)
+				ctrack_stop_retrans_counter(ctrack_replay);
+			else
+			{
+				if (ctrack_replay)
+				{
+					ctrack_replay->hostname_ah_check = *dp->hostlist_auto_filename && !bCheckExcluded;
+					if (ctrack_replay->hostname_ah_check)
+					{
+						// first request is not retrans
+						if (!bDiscoveredHostname)
+							process_retrans_fail(ctrack_replay, IPPROTO_UDP, (struct sockaddr*)&src);
+					}
+				}
+				DLOG("not applying tampering to this request\n");
+				return verdict;
+			}
+		}
+
+		// desync profile may have changed after hostname was revealed
+		switch(l7proto)
+		{
+			case QUIC:
+				fake = dp->fake_quic;
+				fake_size = dp->fake_quic_size;
+				break;
+			case WIREGUARD:
+				fake = dp->fake_wg;
+				fake_size = dp->fake_wg_size;
+				break;
+			case DHT:
+				fake = dp->fake_dht;
+				fake_size = dp->fake_dht_size;
+				break;
+			default:
+				fake = dp->fake_unknown_udp;
+				fake_size = dp->fake_unknown_udp_size;
+				break;
+		}
+
+		ttl_fake = (ctrack_replay && ctrack_replay->autottl) ? ctrack_replay->autottl : (ip6hdr ? (dp->desync_ttl6 ? dp->desync_ttl6 : ttl_orig) : (dp->desync_ttl ? dp->desync_ttl : ttl_orig));
+
+		enum dpi_desync_mode desync_mode = dp->desync_mode;
 		uint32_t fooling_orig = FOOL_NONE;
 
 		if (params.debug)
@@ -1439,18 +1824,18 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 		switch(desync_mode)
 		{
 			case DESYNC_FAKE_KNOWN:
-				if (!bKnownProtocol)
+				if (l7proto==UNKNOWN)
 				{
 					DLOG("not applying fake because of unknown protocol\n");
-					desync_mode = params.desync_mode2;
+					desync_mode = dp->desync_mode2;
 					break;
 				}
 			case DESYNC_FAKE:
-				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, params.desync_fooling_mode, NULL, 0, 0, fake, fake_size, pkt1, &pkt1_len))
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_fake, IP4_TOS(ip),IP6_FLOW(ip6hdr), dp->desync_fooling_mode, NULL, 0, 0, fake, fake_size, pkt1, &pkt1_len))
 					return verdict;
 				DLOG("sending fake request : ");
 				hexdump_limited_dlog(fake,fake_size,PKTDATA_MAXDUMP); DLOG("\n");
-				if (!rawsend_rep((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
+				if (!rawsend_rep(dp->desync_repeats,(struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return verdict;
 				b = true;
 				break;
@@ -1458,10 +1843,11 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 			case DESYNC_DESTOPT:
 			case DESYNC_IPFRAG1:
 				fooling_orig = (desync_mode==DESYNC_HOPBYHOP) ? FOOL_HOPBYHOP : (desync_mode==DESYNC_DESTOPT) ? FOOL_DESTOPT : FOOL_IPFRAG1;
-				if (ip6hdr && (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(params.desync_mode2)))
+				if (ip6hdr && (dp->desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(dp->desync_mode2)))
 				{
 					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst,
-						ttl_orig,fooling_orig,NULL,0,0,
+						ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr),
+						fooling_orig,NULL,0,0,
 						data_payload, len_payload, pkt1, &pkt1_len))
 					{
 						return verdict;
@@ -1472,7 +1858,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					// this mode is final, no other options available
 					return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 				}
-				desync_mode = params.desync_mode2;
+				desync_mode = dp->desync_mode2;
 				break;
 			default:
 				pkt1_len=0;
@@ -1481,7 +1867,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 
 		if (b)
 		{
-			if (params.desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(params.desync_mode2))
+			if (dp->desync_mode2==DESYNC_NONE || !desync_valid_second_stage_udp(dp->desync_mode2))
 			{
 				DLOG("reinjecting original packet. len=%zu len_payload=%zu\n", *len_pkt, len_payload);
 				verdict_udp_csum_fix(verdict, udphdr, transport_len, ip, ip6hdr);
@@ -1489,19 +1875,19 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					return verdict;
 				return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
 			}
-			desync_mode = params.desync_mode2;
+			desync_mode = dp->desync_mode2;
 		}
 
 		switch(desync_mode)
 		{
 			case DESYNC_UDPLEN:
 				pkt1_len = sizeof(pkt1);
-				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, params.udplen_pattern, sizeof(params.udplen_pattern), params.udplen_increment, data_payload, len_payload, pkt1, &pkt1_len))
+				if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr), fooling_orig, dp->udplen_pattern, sizeof(dp->udplen_pattern), dp->udplen_increment, data_payload, len_payload, pkt1, &pkt1_len))
 				{
 					DLOG("could not construct packet with modified length. too large ?\n");
 					return verdict;
 				}
-				DLOG("resending original packet with increased by %d length\n", params.udplen_increment);
+				DLOG("resending original packet with increased by %d length\n", dp->udplen_increment);
 				if (!rawsend((struct sockaddr *)&dst, desync_fwmark, ifout , pkt1, pkt1_len))
 					return verdict;
 				return ct_new_postnat_fix_udp(ctrack, ip, ip6hdr, udphdr, len_pkt);
@@ -1521,7 +1907,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					memcpy(pkt2+pkt2_len,data_payload+1,szcopy);
 					pkt2_len+=szcopy;
 					pkt1_len = sizeof(pkt1);
-					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
+					if (!prepare_udp_segment((struct sockaddr *)&src, (struct sockaddr *)&dst, ttl_orig,IP4_TOS(ip),IP6_FLOW(ip6hdr), fooling_orig, NULL, 0 , 0, pkt2, pkt2_len, pkt1, &pkt1_len))
 					{
 						DLOG("could not construct packet with modified length. too large ?\n");
 						return verdict;
@@ -1543,7 +1929,7 @@ static uint8_t dpi_desync_udp_packet_play(bool replay, size_t reasm_offset, uint
 					uint8_t pkt3[DPI_DESYNC_MAX_FAKE_LEN+100], *pkt_orig;
 					size_t pkt_orig_len;
 					
-					size_t ipfrag_pos = (params.desync_ipfrag_pos_udp && params.desync_ipfrag_pos_udp<transport_len) ? params.desync_ipfrag_pos_udp : sizeof(struct udphdr);
+					size_t ipfrag_pos = (dp->desync_ipfrag_pos_udp && dp->desync_ipfrag_pos_udp<transport_len) ? dp->desync_ipfrag_pos_udp : sizeof(struct udphdr);
 					// freebsd do not set ip.id
 					uint32_t ident = ip ? ip->ip_id ? ip->ip_id : htons(1+random()%0xFFFF) : htonl(1+random()%0xFFFFFFFF);
 
